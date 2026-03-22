@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
 :root {
   --background: #0a0a0f;
   --foreground: #e4e4e7;
@@ -16,36 +17,60 @@
   --border: #27272a;
   --ring: #6366f1;
   --destructive: #ef4444;
+
+  /* Typography rhythm */
+  --leading-body: 1.65;
+  --leading-heading: 1.25;
+  --leading-tight: 1.4;
+}
+
+/* ── Base typography ────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 15px; /* base for rem units */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  /* English → JetBrains Mono → system Chinese */
   font-family: var(--font-mono), 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Headings use bold serif (English) with Chinese fallback */
+/* Headings: consistent leading + tight tracking */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-serif), 'Noto Serif SC', 'STSong', Georgia, serif;
+  font-family: var(--font-serif), 'Noto Serif SC', Georgia, serif;
+  line-height: var(--leading-heading);
+  letter-spacing: -0.01em;
 }
 
-/* Buttons, labels, nav: mono */
-button, label, input, select, textarea {
-  font-family: inherit;
+/* Paragraph / list text */
+p, li {
+  line-height: var(--leading-body);
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
+/* Compact single-line labels (buttons, badges, tags) */
+button, label, .label {
+  line-height: var(--leading-tight);
 }
-::-webkit-scrollbar-track {
-  background: var(--background);
+
+/* Small / muted helper text */
+small, .text-xs, .text-sm {
+  line-height: var(--leading-tight);
 }
-::-webkit-scrollbar-thumb {
-  background: var(--muted);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
-}
+
+/* ── Section spacing helpers (applied via className) ────────────────────────── */
+/* Consistent vertical rhythm: use mb-section between major blocks */
+.mb-section { margin-bottom: 2rem; }
+.mb-block   { margin-bottom: 1.25rem; }
+.mb-item    { margin-bottom: 0.75rem; }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }

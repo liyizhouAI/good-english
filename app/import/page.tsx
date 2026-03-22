@@ -115,8 +115,7 @@ export default function ImportPage() {
   const [fetchedSources, setFetchedSources] = useState<FetchedSource[]>([]);
   const [queuedJobs, setQueuedJobs] = useState<QueuedJob[]>([]);
   const [authError, setAuthError] = useState("");
-  const urlSubmitDisabled =
-    !urlInput.trim() || authLoading || (mode === "url" && !user);
+  const urlSubmitDisabled = !urlInput.trim();
 
   const queuedJobIds = useMemo(
     () => queuedJobs.map((job) => job.id),
@@ -293,13 +292,12 @@ export default function ImportPage() {
       return;
     }
 
-    if (authLoading) {
-      setError("正在恢复登录状态，请稍后几秒再试");
-      setStep("input");
-      return;
-    }
+    const supabase = createClient();
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!currentUser) {
       setError("URL 导入需要先登录 Google，这样 Mac mini 才能把结果写回你的 Supabase");
       setStep("input");
       return;
@@ -310,12 +308,11 @@ export default function ImportPage() {
     setFetchedSources([]);
 
     try {
-      const supabase = createClient();
       const { data, error } = await supabase
         .from("content_fetch_jobs")
         .insert(
           urls.map((url) => ({
-            user_id: user.id,
+            user_id: currentUser.id,
             source_url: url,
             status: "pending",
           })),
@@ -616,7 +613,7 @@ export default function ImportPage() {
 
           {mode === "url" && authLoading && (
             <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
-              正在恢复登录状态，完成后才能提交 URL 抓取任务。
+              页面还在恢复登录状态；如果你已经登录成功，也可以直接点“提交抓取任务”，系统会再次向 Supabase 确认当前账号。
             </div>
           )}
 
@@ -628,13 +625,7 @@ export default function ImportPage() {
             className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             <Sparkles className="h-4 w-4" />
-            {mode === "url"
-              ? authLoading
-                ? "正在恢复登录..."
-                : user
-                  ? "提交抓取任务"
-                  : "请先登录 Google"
-              : "AI 提取词汇和句型"}
+            {mode === "url" ? "提交抓取任务" : "AI 提取词汇和句型"}
           </button>
         </div>
       )}

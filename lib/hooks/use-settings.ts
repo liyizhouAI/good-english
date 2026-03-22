@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   voiceProviderId: "openai",
   providers: DEFAULT_PROVIDERS,
 };
+const SYNC_TIMEOUT_MS = 8000;
 
 function loadLocalSettings(): AppSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
@@ -37,6 +38,15 @@ function loadLocalSettings(): AppSettings {
 
 function saveLocalSettings(settings: AppSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("sync timeout")), ms),
+    ),
+  ]);
 }
 
 // Merge remote settings (remote keys win, but keep local keys for providers not in remote)
@@ -67,7 +77,10 @@ export function useSettings() {
     async function syncSettings(baseSettings: AppSettings) {
       setSyncing(true);
       try {
-        const remote = await loadRemoteSettings(supabase);
+        const remote = await withTimeout(
+          loadRemoteSettings(supabase),
+          SYNC_TIMEOUT_MS,
+        );
         if (cancelled) return;
 
         if (remote) {
@@ -75,7 +88,10 @@ export function useSettings() {
           setSettings(merged);
           saveLocalSettings(merged);
         } else {
-          await saveRemoteSettings(supabase, baseSettings);
+          await withTimeout(
+            saveRemoteSettings(supabase, baseSettings),
+            SYNC_TIMEOUT_MS,
+          );
         }
 
         if (!cancelled) {
@@ -126,7 +142,10 @@ export function useSettings() {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
         try {
-          await saveRemoteSettings(supabase, next);
+          await withTimeout(
+            saveRemoteSettings(supabase, next),
+            SYNC_TIMEOUT_MS,
+          );
           setSynced(true);
         } catch (error) {
           console.error(

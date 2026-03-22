@@ -25,15 +25,18 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle(nextPath?: string) {
     const supabase = createClient();
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+            nextPath || `${window.location.pathname}${window.location.search}`,
+          )}`
+        : "";
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo:
-          typeof window !== "undefined"
-            ? `${window.location.origin}/auth/callback`
-            : "",
+        redirectTo,
       },
     });
     return { error };

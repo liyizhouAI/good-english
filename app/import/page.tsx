@@ -91,7 +91,7 @@ function detectUrlType(url: string): UrlContentType {
 
 export default function ImportPage() {
   const { getActiveProvider } = useSettings();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<ImportMode>("text");
   const [textInput, setTextInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
@@ -114,6 +114,7 @@ export default function ImportPage() {
   } | null>(null);
   const [fetchedSources, setFetchedSources] = useState<FetchedSource[]>([]);
   const [queuedJobs, setQueuedJobs] = useState<QueuedJob[]>([]);
+  const [authError, setAuthError] = useState("");
 
   const queuedJobIds = useMemo(
     () => queuedJobs.map((job) => job.id),
@@ -587,6 +588,27 @@ export default function ImportPage() {
             <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
+            </div>
+          )}
+
+          {mode === "url" && !authLoading && !user && (
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+              <p className="text-sm text-amber-300">
+                URL 导入会把任务发给 Mac mini 处理，所以需要先登录 Google，系统才能把结果写回你自己的 Supabase。
+              </p>
+              <button
+                onClick={async () => {
+                  setAuthError("");
+                  const { error } = await signInWithGoogle("/import");
+                  if (error) setAuthError(error.message);
+                }}
+                className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                先登录 Google
+              </button>
+              {authError && (
+                <p className="mt-2 text-xs text-red-400">{authError}</p>
+              )}
             </div>
           )}
 

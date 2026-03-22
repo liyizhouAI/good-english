@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   MessageSquare,
   BookOpen,
@@ -9,22 +9,22 @@ import {
   Import,
   Settings,
   LayoutDashboard,
-  Zap,
   ChevronLeft,
   ChevronRight,
   Menu,
   X,
-} from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
-import { useState, useEffect } from 'react';
+} from "lucide-react";
+import { SidebarLogo, TopBarLogo } from "@/components/ui/logo";
+import { cn } from "@/lib/utils/cn";
+import { useState, useEffect } from "react";
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Dashboard', labelCn: '仪表盘', icon: LayoutDashboard },
-  { href: '/import', label: 'Import', labelCn: '素材导入', icon: Import },
-  { href: '/vocabulary', label: 'Vocabulary', labelCn: '词汇', icon: BookOpen },
-  { href: '/chat', label: 'AI Chat', labelCn: 'AI 对话', icon: MessageSquare },
-  { href: '/patterns', label: 'Patterns', labelCn: '句型', icon: FileText },
-  { href: '/settings', label: 'Settings', labelCn: '设置', icon: Settings },
+  { href: "/", label: "Dashboard", labelCn: "仪表盘", icon: LayoutDashboard },
+  { href: "/import", label: "Import", labelCn: "素材导入", icon: Import },
+  { href: "/vocabulary", label: "Vocabulary", labelCn: "词汇", icon: BookOpen },
+  { href: "/chat", label: "AI Chat", labelCn: "AI 对话", icon: MessageSquare },
+  { href: "/patterns", label: "Patterns", labelCn: "句型", icon: FileText },
+  { href: "/settings", label: "Settings", labelCn: "设置", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -53,8 +53,7 @@ export function Sidebar() {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <Zap className="h-5 w-5 text-[var(--primary)]" />
-        <span className="text-base font-bold tracking-tight">Good English</span>
+        <TopBarLogo />
       </div>
 
       {/* 手机端遮罩 */}
@@ -68,26 +67,25 @@ export function Sidebar() {
       {/* 手机端抽屉 / 桌面端侧边栏 */}
       <aside
         className={cn(
-          'flex flex-col border-r border-[var(--border)] bg-[var(--card)] transition-all duration-200 z-50',
+          "flex flex-col border-r border-[var(--border)] bg-[var(--card)] transition-all duration-200 z-50",
           // 手机：fixed 抽屉
-          'fixed md:relative inset-y-0 left-0 h-screen',
+          "fixed md:relative inset-y-0 left-0 h-screen",
           // 手机开关
-          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           // 桌面宽度
-          collapsed ? 'md:w-16' : 'md:w-64',
+          collapsed ? "md:w-16" : "md:w-64",
           // 手机固定宽度
-          'w-64',
+          "w-64",
         )}
       >
         {/* Logo */}
-        <div className={cn(
-          'flex items-center border-b border-[var(--border)]',
-          collapsed ? 'md:justify-center px-0 py-5' : 'gap-2 px-6 py-5'
-        )}>
-          <Zap className="h-6 w-6 text-[var(--primary)] shrink-0" />
-          {!collapsed && (
-            <span className="text-lg font-bold tracking-tight">Good English</span>
+        <div
+          className={cn(
+            "flex items-center border-b border-[var(--border)]",
+            collapsed ? "md:justify-center px-0 py-5" : "gap-2 px-6 py-5",
           )}
+        >
+          <SidebarLogo collapsed={collapsed} />
           {/* 手机关闭按钮 */}
           <button
             className="md:hidden ml-auto mr-2 p-1 rounded hover:bg-[var(--secondary)]"
@@ -99,20 +97,21 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-1">
-          {NAV_ITEMS.map(item => {
-            const isActive = pathname === item.href ||
-              (item.href !== '/' && pathname.startsWith(item.href));
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 title={item.labelCn}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-                  collapsed ? 'md:justify-center md:px-0' : '',
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  collapsed ? "md:justify-center md:px-0" : "",
                   isActive
-                    ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
-                    : 'text-[var(--secondary-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]'
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                    : "text-[var(--secondary-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]",
                 )}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
@@ -127,14 +126,20 @@ export function Sidebar() {
         {/* Footer + 桌面收起按钮 */}
         <div className="border-t border-[var(--border)] px-3 py-4 flex items-center justify-between">
           {!collapsed && (
-            <p className="text-xs text-[var(--muted-foreground)]">英语战斗力恢复系统</p>
+            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+              像播客嘉宾一样侃侃而谈
+            </p>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="hidden md:flex ml-auto items-center justify-center p-1.5 rounded-lg hover:bg-[var(--secondary)] text-[var(--muted-foreground)]"
-            title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+            title={collapsed ? "展开侧边栏" : "收起侧边栏"}
           >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </button>
         </div>
       </aside>

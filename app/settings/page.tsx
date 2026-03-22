@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { LoginCard } from "@/components/auth/login-card";
 import { Eye, EyeOff, Check, AlertCircle, Mic } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export default function SettingsPage() {
-  const { settings, updateProvider, setActiveProvider } = useSettings();
+  const { settings, syncing, synced, updateProvider, setActiveProvider } =
+    useSettings();
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [testStatus, setTestStatus] = useState<
     Record<string, "idle" | "testing" | "success" | "error">
@@ -44,8 +46,10 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-1">AI 设置</h1>
       <p className="text-sm text-[var(--muted-foreground)] mb-6">
-        配置 AI 服务商，API Key 仅存储在你的浏览器本地
+        配置 AI 服务商，登录后 API Key 自动加密同步到云端
       </p>
+
+      <LoginCard syncing={syncing} synced={synced} />
 
       {/* Voice */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 mb-6">

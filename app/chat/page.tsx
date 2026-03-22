@@ -120,7 +120,7 @@ export default function ChatPage() {
 
       mediaRecorderRef.current.stop();
     });
-  }, [getVoiceProvider, settings.voiceProviderId]);
+  }, [settings.providers]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -231,17 +231,15 @@ export default function ChatPage() {
     setError("");
   }
 
-  const voiceProvider = getVoiceProvider();
-  const hasVoiceKey = !!voiceProvider?.apiKey;
-  const voiceName =
-    settings.voiceProviderId === "minimax" ? "MiniMax" : "OpenAI";
+  const hasVoiceKey = !!settings.providers.find((p) => p.id === "openai")
+    ?.apiKey;
   const micButton = (
     <button
       onClick={toggleRecording}
       disabled={isLoading || isTranscribing || !hasVoiceKey}
       title={
         !hasVoiceKey
-          ? `需要配置 ${voiceName} API Key`
+          ? "需要配置 OpenAI API Key"
           : isRecording
             ? "再次点击停止录音"
             : "点击开始说话"
@@ -342,12 +340,12 @@ export default function ChatPage() {
           (hasVoiceKey ? (
             <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-sm text-emerald-400 mb-4">
               <Mic className="h-4 w-4 shrink-0" />
-              语音输入已就绪（{voiceName}）— 点麦克风说话，停止后自动识别
+              语音输入已就绪（OpenAI Whisper）— 点麦克风说话，停止后自动识别
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-400 mb-4">
               <Mic className="h-4 w-4 shrink-0" />
-              语音输入需要 {voiceName} API Key — 去设置页配置或切换语音引擎
+              语音输入需要 OpenAI API Key — 去设置页配置
             </div>
           ))}
 

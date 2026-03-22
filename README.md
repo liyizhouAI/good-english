@@ -39,7 +39,7 @@
 ### 1. 素材导入 & 智能提取（`/import`）
 - 粘贴文本直接 AI 提取；URL 写入 Supabase 抓取队列，由常驻 Mac mini 调用 Content Fetcher skill 处理
 - AI 自动提取：高级词汇 / 可复用句型 / 关键短语
-- 抓取完成后自动归档 Markdown 到项目内 `抓内容素材/`
+- 抓取完成后自动归档 Markdown 到项目内 `DB/`
 - Markdown、词汇、句型统一写回 Supabase，所有设备读取同一份云端数据
 
 ### 2. 词汇恢复系统（`/vocabulary`）
@@ -177,7 +177,7 @@ Vercel 生产环境已配置同名变量。
 1. 手机浏览器打开 `/import`，登录 Google，提交 URL
 2. 前端把 URL 写入 Supabase `content_fetch_jobs`
 3. Mac mini 常驻执行 `scripts/process-fetch-jobs.mjs --watch`
-4. 脚本调用本机 Content Fetcher skill 抓全文，生成 Markdown，并归档到 `抓内容素材/`
+4. 脚本调用本机 Content Fetcher skill 抓全文，生成 Markdown，并归档到 `DB/`
 5. 脚本调用 `/api/extract` 提取词汇 / 句型 / 关键短语
 6. 最终把 `materials_data / words_data / patterns_data` 直接写回 Supabase
 
@@ -200,7 +200,7 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY npm run worker
 SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY npm run worker:once
 ```
 
-worker 默认使用 Supabase Realtime 监听新任务，并用 15 秒轻量轮询做兜底，不依赖每分钟 cron。
+worker 默认使用 Supabase Realtime 监听新任务，并用 15 秒轻量轮询做兜底，不依赖每分钟 cron。归档文件名统一为 `YYYY-MM-DD_HHmm_来源_内容slug_短哈希.md`。
 
 ---
 

@@ -49,6 +49,15 @@ function shortHash(input: string): string {
   return Math.abs(hash).toString(36).slice(0, 8);
 }
 
+function formatArchiveTimestamp(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}_${hours}${minutes}`;
+}
+
 function slugify(input: string): string {
   const ascii = input
     .normalize("NFKD")
@@ -134,9 +143,10 @@ function resolveFetcherScriptPath(): string | null {
 }
 
 function resolveArchiveRoot(): { root: string; warning?: string } {
+  const defaultRoot = path.join(process.cwd(), "DB");
   const candidates = [
     process.env.GOOD_ENGLISH_ARCHIVE_DIR,
-    path.join(process.cwd(), "抓内容素材"),
+    defaultRoot,
     path.join(os.tmpdir(), "good-english-materials"),
   ].filter(Boolean) as string[];
 
@@ -146,7 +156,7 @@ function resolveArchiveRoot(): { root: string; warning?: string } {
       accessSync(candidate, constants.W_OK);
       const warning =
         candidate.startsWith(os.tmpdir()) ||
-        candidate !== path.join(process.cwd(), "抓内容素材")
+        candidate !== defaultRoot
           ? `当前环境无法稳定写入项目目录，已写入 ${candidate}`
           : undefined;
       return { root: candidate, warning };
@@ -159,7 +169,12 @@ function resolveArchiveRoot(): { root: string; warning?: string } {
 }
 
 function buildArchiveStem(url: string, type: UrlType, title?: string): string {
-  return `${type}-${slugify(title || "material")}-${shortHash(url)}`;
+  return [
+    formatArchiveTimestamp(),
+    type,
+    slugify(title || "material"),
+    shortHash(url),
+  ].join("_");
 }
 
 function rewriteAssetPaths(markdown: string, fromDir: string, toDir: string): string {

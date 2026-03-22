@@ -29,7 +29,7 @@ const CONTENT_FETCHER_SCRIPT =
   "/Users/liyizhouai/Desktop/openclaw/skill/内容抓取/scripts/fetch.py";
 const ARCHIVE_DIR =
   process.env.GOOD_ENGLISH_ARCHIVE_DIR ||
-  path.join(process.cwd(), "抓内容素材");
+  path.join(process.cwd(), "DB");
 const JOB_LIMIT = Number(process.env.GOOD_ENGLISH_JOB_LIMIT || 3);
 const POLL_INTERVAL_MS = Number(process.env.GOOD_ENGLISH_POLL_INTERVAL_MS || 15000);
 const WATCH_MODE = process.argv.includes("--watch");
@@ -66,6 +66,15 @@ function shortHash(input) {
     hash = (hash * 31 + input.charCodeAt(i)) | 0;
   }
   return Math.abs(hash).toString(36).slice(0, 8);
+}
+
+function formatArchiveTimestamp(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}_${hours}${minutes}`;
 }
 
 function detectUrlType(url) {
@@ -117,7 +126,12 @@ function getDefaultSM2Fields() {
 }
 
 function buildArchiveStem(url, type, title) {
-  return `${type}-${slugify(title || "material")}-${shortHash(url)}`;
+  return [
+    formatArchiveTimestamp(),
+    type,
+    slugify(title || "material"),
+    shortHash(url),
+  ].join("_");
 }
 
 function rewriteAssetPaths(markdown, fromDir, toDir) {

@@ -769,7 +769,7 @@ export default function ImportPage() {
               </p>
               <p className="mt-1 text-xs text-[var(--muted-foreground)]">
                 {fetchedSources.some((source) => source.archiveRelativePath)
-                  ? `归档目录：抓内容素材 / ${fetchedSources.find((source) => source.archiveRelativePath)?.archiveRelativePath?.split("/").pop()}`
+                  ? `归档目录：DB / ${fetchedSources.find((source) => source.archiveRelativePath)?.archiveRelativePath?.split("/").pop()}`
                   : "当前环境未返回本地归档路径"}
               </p>
             </div>

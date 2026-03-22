@@ -1,0 +1,356 @@
+[     143ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3456/favicon.ico:0
+[   11776ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+      <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+        <LoadingBoundary name="settings/" loading={null}>
+          <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+            <RedirectBoundary>
+              <RedirectErrorBoundary router={{...}}>
+                <InnerLayoutRouter url="/settings" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                  <SegmentViewNode type="page" pagePath="settings/p...">
+                    <SegmentTrieNode>
+                    <ClientPageRoot Component={function SettingsPage} serverProvidedParams={{...}}>
+                      <SettingsPage params={Promise} searchParams={Promise}>
+                        <div className="max-w-2xl ...">
+                          <h1>
+                          <p>
+                          <div className="rounded-xl...">
+                            <div>
+                            <div className="grid grid-...">
+                              <button
+                                onClick={function onClick}
++                               className="rounded-lg border p-4 text-left transition-colors border-[var(--border)] ho..."
+-                               className="rounded-lg border p-4 text-left transition-colors border-[var(--primary)]/5..."
+                              >
+                                <div className="flex items...">
+-                                 <span className="text-xs rounded-full bg-[var(--primary)] text-white px-2 py-0.5">
+                                ...
+                              ...
+                          ...
+                  ...
+                ...
+      ...
+
+    at throwOnHydrationMismatch (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3318:56)
+    at popHydrationState (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3403:13)
+    at completeWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:6922:25)
+    at runWithFiberInDEV (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:965:74)
+    at completeUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9622:23)
+    at performUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9557:28)
+    at workLoopConcurrentByScheduler (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9551:58)
+    at renderRootConcurrent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9534:71)
+    at performWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_09n4nq-._.js:2647:64)
+[   20808ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+      <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+        <LoadingBoundary name="settings/" loading={null}>
+          <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+            <RedirectBoundary>
+              <RedirectErrorBoundary router={{...}}>
+                <InnerLayoutRouter url="/settings" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                  <SegmentViewNode type="page" pagePath="settings/p...">
+                    <SegmentTrieNode>
+                    <ClientPageRoot Component={function SettingsPage} serverProvidedParams={{...}}>
+                      <SettingsPage params={Promise} searchParams={Promise}>
+                        <div className="max-w-2xl ...">
+                          <h1>
+                          <p>
+                          <div className="rounded-xl...">
+                            <div>
+                            <div className="grid grid-...">
+                              <button
+                                onClick={function onClick}
++                               className="rounded-lg border p-4 text-left transition-colors border-[var(--border)] ho..."
+-                               className="rounded-lg border p-4 text-left transition-colors border-[var(--primary)]/5..."
+                              >
+                                <div className="flex items...">
+-                                 <span className="text-xs rounded-full bg-[var(--primary)] text-white px-2 py-0.5">
+                                ...
+                              ...
+                          ...
+                  ...
+                ...
+      ...
+
+    at throwOnHydrationMismatch (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3318:56)
+    at popHydrationState (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3403:13)
+    at completeWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:6922:25)
+    at runWithFiberInDEV (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:965:74)
+    at completeUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9622:23)
+    at performUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9557:28)
+    at workLoopSync (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9449:40)
+    at renderRootSync (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9433:13)
+    at performWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9061:186)
+    at performSyncWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10263:9)
+    at flushSyncWorkAcrossRoots_impl (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10179:316)
+    at dispatchEvent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:13021:174)
+    at dispatchDiscreteEvent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:12984:64)
+[  135060ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+      <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+        <LoadingBoundary name="settings/" loading={null}>
+          <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+            <RedirectBoundary>
+              <RedirectErrorBoundary router={{...}}>
+                <InnerLayoutRouter url="/settings" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                  <SegmentViewNode type="page" pagePath="settings/p...">
+                    <SegmentTrieNode>
+                    <ClientPageRoot Component={function SettingsPage} serverProvidedParams={{...}}>
+                      <SettingsPage params={Promise} searchParams={Promise}>
+                        <div className="max-w-2xl ...">
+                          <h1>
+                          <p>
+                          <div className="rounded-xl...">
+                            <div>
+                            <div className="grid grid-...">
+                              <button
+                                onClick={function onClick}
++                               className="rounded-lg border p-4 text-left transition-colors border-[var(--border)] ho..."
+-                               className="rounded-lg border p-4 text-left transition-colors border-[var(--primary)]/5..."
+                              >
+                                <div className="flex items...">
+-                                 <span className="text-xs rounded-full bg-[var(--primary)] text-white px-2 py-0.5">
+                                ...
+                              ...
+                          ...
+                  ...
+                ...
+      ...
+
+    at throwOnHydrationMismatch (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3318:56)
+    at popHydrationState (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3403:13)
+    at completeWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:6922:25)
+    at runWithFiberInDEV (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:965:74)
+    at completeUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9622:23)
+    at performUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9557:28)
+    at workLoopConcurrentByScheduler (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9551:58)
+    at renderRootConcurrent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9534:71)
+    at performWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_09n4nq-._.js:2647:64)
+[  177178ms] Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="chat/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+                <RedirectBoundary>
+                  <RedirectErrorBoundary router={{...}}>
+                    <InnerLayoutRouter url="/chat" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                      <SegmentViewNode type="page" pagePath="chat/page.tsx">
+                        <SegmentTrieNode>
+                        <ClientPageRoot Component={function ChatPage} serverProvidedParams={{...}}>
+                          <ChatPage params={Promise} searchParams={Promise}>
+                            <div className="max-w-2xl ...">
+                              <h1>
+                              <p>
+                              <div>
+                              <div>
+                              <div>
+                              <div
++                               className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-..."
+-                               className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/..."
+                              >
+                                <Mic>
++                               语音输入已就绪（
+-                               {"语音输入需要 "}
+                                ...
+                              ...
+                      ...
+                    ...
+          ...
+
+    at throwOnHydrationMismatch (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3318:56)
+    at completeWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:7021:36)
+    at runWithFiberInDEV (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:965:74)
+    at completeUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9622:23)
+    at performUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9557:28)
+    at workLoopSync (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9449:40)
+    at renderRootSync (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9433:13)
+    at performWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9061:186)
+    at performSyncWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10263:9)
+    at flushSyncWorkAcrossRoots_impl (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10179:316)
+    at dispatchEvent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:13021:174)
+    at dispatchDiscreteEvent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:12984:64)
+[  219068ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3456/api/transcribe:0
+[  259585ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3456/api/transcribe:0
+[  264167ms] Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="chat/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+                <RedirectBoundary>
+                  <RedirectErrorBoundary router={{...}}>
+                    <InnerLayoutRouter url="/chat" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                      <SegmentViewNode type="page" pagePath="chat/page.tsx">
+                        <SegmentTrieNode>
+                        <ClientPageRoot Component={function ChatPage} serverProvidedParams={{...}}>
+                          <ChatPage params={Promise} searchParams={Promise}>
+                            <div className="max-w-2xl ...">
+                              <h1>
+                              <p>
+                              <div>
+                              <div>
+                              <div>
+                              <div
++                               className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-..."
+-                               className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/..."
+                              >
+                                <Mic>
++                               语音输入已就绪（
+-                               {"语音输入需要 "}
+                                ...
+                              ...
+                      ...
+                    ...
+          ...
+
+    at throwOnHydrationMismatch (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3318:56)
+    at completeWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:7021:36)
+    at runWithFiberInDEV (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:965:74)
+    at completeUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9622:23)
+    at performUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9557:28)
+    at workLoopConcurrentByScheduler (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9551:58)
+    at renderRootConcurrent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9534:71)
+    at performWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_09n4nq-._.js:2647:64)
+[  359001ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3456/api/transcribe:0
+[  381245ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3456/api/transcribe:0
+[  642606ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="chat/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+                <RedirectBoundary>
+                  <RedirectErrorBoundary router={{...}}>
+                    <InnerLayoutRouter url="/chat" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                      <SegmentViewNode type="page" pagePath="chat/page.tsx">
+                        <SegmentTrieNode>
+                        <ClientPageRoot Component={function ChatPage} serverProvidedParams={{...}}>
+                          <ChatPage params={Promise} searchParams={Promise}>
+                            <div className="max-w-2xl ...">
+                              <h1>
+                              <p>
+                              <div>
+                              <div>
+                              <div>
+                              <div
++                               className="flex gap-2"
+-                               className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/..."
+                              >
++                               <input
++                                 type="text"
++                                 value=""
++                                 onChange={function onChange}
++                                 onKeyDown={function onKeyDown}
++                                 placeholder="Type your first message in English..."
++                                 className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-..."
++                               >
+-                               <svg
+-                                 xmlns="http://www.w3.org/2000/svg"
+-                                 width="24"
+-                                 height="24"
+-                                 viewBox="0 0 24 24"
+-                                 fill="none"
+-                                 stroke="currentColor"
+-                                 stroke-width="2"
+-                                 stroke-linecap="round"
+-                                 stroke-linejoin="round"
+-                                 className="lucide lucide-mic h-4 w-4 shrink-0"
+-                                 aria-hidden="true"
+-                               >
+                                ...
+                      ...
+                    ...
+          ...
+
+    at throwOnHydrationMismatch (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:3318:56)
+    at beginWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:6758:918)
+    at runWithFiberInDEV (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:965:74)
+    at performUnitOfWork (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9555:97)
+    at workLoopConcurrentByScheduler (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9551:58)
+    at renderRootConcurrent (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9534:71)
+    at performWorkOnRoot (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_react-dom_0jx2pv3._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3456/_next/static/chunks/059~_next_dist_compiled_09n4nq-._.js:2647:64)
+[  651037ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3456/api/transcribe:0

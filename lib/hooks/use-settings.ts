@@ -62,41 +62,59 @@ export function useSettings() {
     setSettings(local);
 
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
+    let cancelled = false;
+
+    async function syncSettings(baseSettings: AppSettings) {
       setSyncing(true);
-      const remote = await loadRemoteSettings(supabase);
-      if (remote) {
-        const merged = mergeSettings(local, remote);
-        setSettings(merged);
-        saveLocalSettings(merged);
+      try {
+        const remote = await loadRemoteSettings(supabase);
+        if (cancelled) return;
+
+        if (remote) {
+          const merged = mergeSettings(baseSettings, remote);
+          setSettings(merged);
+          saveLocalSettings(merged);
+        } else {
+          await saveRemoteSettings(supabase, baseSettings);
+        }
+
+        if (!cancelled) {
+          setSynced(true);
+        }
+      } catch (error) {
+        console.error(
+          "[settings] sync failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        if (!cancelled) {
+          setSyncing(false);
+        }
       }
-      setSyncing(false);
-      setSynced(true);
+    }
+
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user || cancelled) return;
+      await syncSettings(local);
     });
 
     // Re-sync when auth state changes (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        setSyncing(true);
         const local2 = loadLocalSettings();
-        const remote = await loadRemoteSettings(supabase);
-        if (remote) {
-          const merged = mergeSettings(local2, remote);
-          setSettings(merged);
-          saveLocalSettings(merged);
-        } else {
-          // First login: push local settings to cloud
-          await saveRemoteSettings(supabase, local2);
-        }
-        setSyncing(false);
-        setSynced(true);
+        await syncSettings(local2);
       } else {
-        setSynced(false);
+        if (!cancelled) {
+          setSyncing(false);
+          setSynced(false);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Debounced save: local immediately, remote after 1s
@@ -107,7 +125,15 @@ export function useSettings() {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        await saveRemoteSettings(supabase, next);
+        try {
+          await saveRemoteSettings(supabase, next);
+          setSynced(true);
+        } catch (error) {
+          console.error(
+            "[settings] save failed:",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       }
     }, 1000);
   }, []);

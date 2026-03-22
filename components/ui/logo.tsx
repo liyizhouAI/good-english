@@ -227,7 +227,7 @@ export function GoodEnglishHeading() {
       style={{
         fontFamily: "var(--font-mono)",
         fontWeight: 700,
-        fontSize: "2rem",
+        fontSize: "1.6rem",
         letterSpacing: "0.04em",
         lineHeight: 1.2,
         margin: 0,

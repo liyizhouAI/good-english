@@ -115,6 +115,8 @@ export default function ImportPage() {
   const [fetchedSources, setFetchedSources] = useState<FetchedSource[]>([]);
   const [queuedJobs, setQueuedJobs] = useState<QueuedJob[]>([]);
   const [authError, setAuthError] = useState("");
+  const urlSubmitDisabled =
+    !urlInput.trim() || authLoading || (mode === "url" && !user);
 
   const queuedJobIds = useMemo(
     () => queuedJobs.map((job) => job.id),
@@ -292,7 +294,7 @@ export default function ImportPage() {
     }
 
     if (authLoading) {
-      setError("正在确认登录状态，请稍后重试");
+      setError("正在恢复登录状态，请稍后几秒再试");
       setStep("input");
       return;
     }
@@ -612,13 +614,27 @@ export default function ImportPage() {
             </div>
           )}
 
+          {mode === "url" && authLoading && (
+            <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
+              正在恢复登录状态，完成后才能提交 URL 抓取任务。
+            </div>
+          )}
+
           <button
             onClick={handleExtract}
-            disabled={mode === "text" ? !textInput.trim() : !urlInput.trim()}
+            disabled={
+              mode === "text" ? !textInput.trim() : urlSubmitDisabled
+            }
             className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             <Sparkles className="h-4 w-4" />
-            {mode === "url" ? "提交抓取任务" : "AI 提取词汇和句型"}
+            {mode === "url"
+              ? authLoading
+                ? "正在恢复登录..."
+                : user
+                  ? "提交抓取任务"
+                  : "请先登录 Google"
+              : "AI 提取词汇和句型"}
           </button>
         </div>
       )}

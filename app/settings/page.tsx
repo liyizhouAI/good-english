@@ -5,24 +5,8 @@ import { useSettings } from "@/lib/hooks/use-settings";
 import { Eye, EyeOff, Check, AlertCircle, Mic } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-const VOICE_PROVIDERS = [
-  {
-    id: "openai" as const,
-    name: "OpenAI Whisper",
-    desc: "识别率最高，支持多语言，需要 OpenAI API Key",
-    supported: true,
-  },
-  {
-    id: "minimax" as const,
-    name: "MiniMax 语音识别",
-    desc: "MiniMax speech-01 模型，中英文识别，需要 MiniMax API Key",
-    supported: true,
-  },
-];
-
 export default function SettingsPage() {
-  const { settings, updateProvider, setActiveProvider, setVoiceProvider } =
-    useSettings();
+  const { settings, updateProvider, setActiveProvider } = useSettings();
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [testStatus, setTestStatus] = useState<
     Record<string, "idle" | "testing" | "success" | "error">
@@ -63,62 +47,37 @@ export default function SettingsPage() {
         配置 AI 服务商，API Key 仅存储在你的浏览器本地
       </p>
 
-      {/* Voice Provider */}
+      {/* Voice */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 mb-6">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-2">
           <Mic className="h-4 w-4 text-[var(--primary)]" />
-          <h3 className="font-semibold">语音识别引擎</h3>
+          <h3 className="font-semibold">语音识别</h3>
+          <span className="ml-auto text-xs rounded-full bg-[var(--primary)] text-white px-2 py-0.5">
+            OpenAI Whisper
+          </span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {VOICE_PROVIDERS.map((vp) => {
-            const isSelected = settings.voiceProviderId === vp.id;
-            const providerConfig = settings.providers.find(
-              (p) => p.id === vp.id,
-            );
-            const hasKey = !!providerConfig?.apiKey;
-            return (
-              <button
-                key={vp.id}
-                onClick={() => vp.supported && setVoiceProvider(vp.id)}
-                disabled={!vp.supported}
-                className={cn(
-                  "rounded-lg border p-4 text-left transition-colors",
-                  !vp.supported
-                    ? "border-[var(--border)] opacity-50 cursor-not-allowed"
-                    : isSelected
-                      ? "border-[var(--primary)]/50 bg-[var(--primary)]/5"
-                      : "border-[var(--border)] hover:border-[var(--muted)]",
-                )}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <p className="font-medium text-sm">{vp.name}</p>
-                  {!vp.supported ? (
-                    <span className="text-xs rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)] px-2 py-0.5">
-                      暂不支持
-                    </span>
-                  ) : isSelected ? (
-                    <span className="text-xs rounded-full bg-[var(--primary)] text-white px-2 py-0.5">
-                      使用中
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  {vp.desc}
-                </p>
-                {vp.supported && (
-                  <p
-                    className={cn(
-                      "text-xs mt-2 font-medium",
-                      hasKey ? "text-emerald-400" : "text-amber-400",
-                    )}
-                  >
-                    {hasKey ? "✓ API Key 已配置" : "⚠ 需配置 API Key"}
-                  </p>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <p className="text-xs text-[var(--muted-foreground)]">
+          语音输入使用 OpenAI Whisper，识别准确率高，支持中英文混合。配置下方
+          OpenAI API Key 即可使用。
+        </p>
+        {(() => {
+          const openaiProvider = settings.providers.find(
+            (p) => p.id === "openai",
+          );
+          const hasKey = !!openaiProvider?.apiKey;
+          return (
+            <p
+              className={cn(
+                "text-xs mt-3 font-medium",
+                hasKey ? "text-emerald-400" : "text-amber-400",
+              )}
+            >
+              {hasKey
+                ? "✓ OpenAI Key 已配置，语音可用"
+                : "⚠ 需配置 OpenAI API Key 才能使用语音"}
+            </p>
+          );
+        })()}
       </div>
 
       {/* AI Providers */}

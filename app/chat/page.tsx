@@ -33,7 +33,7 @@ interface ChatMsg {
 }
 
 export default function ChatPage() {
-  const { getActiveProvider, getVoiceProvider, settings } = useSettings();
+  const { getActiveProvider, settings } = useSettings();
   const [persona, setPersona] = useState<Persona>(PERSONAS[0]);
   const [scenario, setScenario] = useState<Scenario>(SCENARIOS[0]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -78,11 +78,12 @@ export default function ChatPage() {
           return;
         }
 
-        const voiceProvider = getVoiceProvider();
-        if (!voiceProvider?.apiKey) {
-          setError(
-            `请在设置页面配置 ${settings.voiceProviderId === "minimax" ? "MiniMax" : "OpenAI"} API Key 以使用语音输入`,
-          );
+        // 语音识别固定使用 OpenAI Whisper
+        const openaiProvider = settings.providers.find(
+          (p) => p.id === "openai",
+        );
+        if (!openaiProvider?.apiKey) {
+          setError("请在设置页面配置 OpenAI API Key 以使用语音输入");
           resolve();
           return;
         }
@@ -91,8 +92,7 @@ export default function ChatPage() {
         try {
           const form = new FormData();
           form.append("audio", blob);
-          form.append("apiKey", voiceProvider.apiKey);
-          form.append("provider", voiceProvider.id);
+          form.append("apiKey", openaiProvider.apiKey);
 
           const res = await fetch("/api/transcribe", {
             method: "POST",

@@ -92,7 +92,7 @@ function detectUrlType(url: string): UrlContentType {
 export default function ImportPage() {
   const { getActiveProvider } = useSettings();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
-  const [mode, setMode] = useState<ImportMode>("text");
+  const [mode, setMode] = useState<ImportMode>("url");
   const [textInput, setTextInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [step, setStep] = useState<ImportStep>("input");
@@ -471,17 +471,6 @@ export default function ImportPage() {
           {/* Mode Toggle */}
           <div className="flex gap-2">
             <button
-              onClick={() => setMode("text")}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors",
-                mode === "text"
-                  ? "bg-[var(--primary)] text-white"
-                  : "bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--muted)]",
-              )}
-            >
-              <FileText className="h-4 w-4" /> 粘贴文本
-            </button>
-            <button
               onClick={() => setMode("url")}
               className={cn(
                 "flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors",
@@ -491,6 +480,17 @@ export default function ImportPage() {
               )}
             >
               <LinkIcon className="h-4 w-4" /> 粘贴 URL
+            </button>
+            <button
+              onClick={() => setMode("text")}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors",
+                mode === "text"
+                  ? "bg-[var(--primary)] text-white"
+                  : "bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--muted)]",
+              )}
+            >
+              <FileText className="h-4 w-4" /> 粘贴文本
             </button>
           </div>
 

@@ -13,14 +13,22 @@ export async function POST(req: Request) {
     return new Response("API key is required", { status: 400 });
   }
 
-  const model = getModel(provider);
+  let model;
+  try {
+    model = getModel(provider);
+  } catch (e) {
+    return new Response(`Provider error: ${e}`, { status: 500 });
+  }
 
-  const result = streamText({
-    model,
-    system:
-      systemPrompt || "You are a helpful English tutor. Respond concisely.",
-    messages,
-  });
-
-  return result.toTextStreamResponse();
+  try {
+    const result = streamText({
+      model,
+      system:
+        systemPrompt || "You are a helpful English tutor. Respond concisely.",
+      messages,
+    });
+    return result.toTextStreamResponse();
+  } catch (e) {
+    return new Response(`Model error: ${e}`, { status: 500 });
+  }
 }

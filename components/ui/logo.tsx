@@ -223,9 +223,18 @@ export function SidebarLogo({ collapsed: _ }: { collapsed: boolean }) {
 }
 export function GoodEnglishHeading() {
   return (
-    <div>
-      <h1 className="sr-only">Good English</h1>
-      <LogoLarge />
-    </div>
+    <h1
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontWeight: 700,
+        fontSize: "2rem",
+        letterSpacing: "0.04em",
+        lineHeight: 1.2,
+        margin: 0,
+        color: "var(--foreground)",
+      }}
+    >
+      Good English
+    </h1>
   );
 }

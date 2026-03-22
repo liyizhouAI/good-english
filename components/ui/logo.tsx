@@ -1,203 +1,142 @@
 'use client';
 
-// ─── Pixel block colors (opencode-style metallic gray) ───────────────────────
-const CLR = {
-  dropShadow: '#050709',   // near-black drop shadow
-  face: '#8D99A6',         // main block face
-  hiTop: '#D4DCE4',        // top highlight strip
-  hiLeft: '#B0BBC6',       // left highlight strip
-  shBottom: '#3D4A56',     // bottom shadow strip
-  shRight: '#3D4A56',      // right shadow strip
-} as const;
+// ─── Pixel letter grids (5 wide × 7 tall) ────────────────────────────────────
 
-// ─── Single pixel block with 3-D bevel ───────────────────────────────────────
-function PixelBlock({
-  x, y, p, b,
-}: {
-  x: number; y: number;
-  p: number; // block size
-  b: number; // bevel/shadow thickness
-}) {
+const G = [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,0],[1,0,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]];
+const O = [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]];
+const D = [[1,1,1,0,0],[1,0,0,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,1,0],[1,1,1,0,0]];
+const E = [[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0]];
+const N = [[1,0,0,0,1],[1,1,0,0,1],[1,0,1,0,1],[1,0,0,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]];
+const L = [[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]];
+const I = [[1,1,1,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0],[1,1,1,0,0]];
+const S = [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,0],[0,1,1,1,0],[0,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]];
+const H = [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]];
+
+const GOOD    = [G, O, O, D];
+const ENGLISH = [E, N, G, L, I, S, H];
+
+// ─── Single pixel block ───────────────────────────────────────────────────────
+// faceColor = main block, hiColor = 1px top highlight strip, shadow always dark
+interface BlockProps { x: number; y: number; p: number; face: string; hi: string }
+
+function Block({ x, y, p, face, hi }: BlockProps) {
+  const hs = Math.max(1, Math.round(p / 5)); // highlight strip height
   return (
-    <>
-      {/* Drop shadow — offset bottom-right */}
-      <rect x={x + b} y={y + b} width={p} height={p} fill={CLR.dropShadow} />
+    <g>
+      {/* 1px drop shadow */}
+      <rect x={x + 1} y={y + 1} width={p} height={p} fill="#06090C" />
       {/* Main face */}
-      <rect x={x} y={y} width={p} height={p} fill={CLR.face} />
-      {/* Top highlight (full width) */}
-      <rect x={x} y={y} width={p} height={b} fill={CLR.hiTop} />
-      {/* Left highlight */}
-      <rect x={x} y={y + b} width={b} height={p - b * 2} fill={CLR.hiLeft} />
-      {/* Bottom shadow */}
-      <rect x={x} y={y + p - b} width={p} height={b} fill={CLR.shBottom} />
-      {/* Right shadow */}
-      <rect x={x + p - b} y={y + b} width={b} height={p - b} fill={CLR.shRight} />
-    </>
+      <rect x={x} y={y} width={p} height={p} fill={face} />
+      {/* Top highlight strip */}
+      <rect x={x} y={y} width={p} height={hs} fill={hi} />
+    </g>
   );
 }
 
-// ─── Pixel-art letter grids (5-wide × 7-tall) ────────────────────────────────
-
-const LETTER_G = [
-  [0, 1, 1, 1, 0],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 0],
-  [1, 0, 1, 1, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [0, 1, 1, 1, 0],
-];
-
-const LETTER_O = [
-  [0, 1, 1, 1, 0],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [0, 1, 1, 1, 0],
-];
-
-const LETTER_D = [
-  [1, 1, 1, 0, 0],
-  [1, 0, 0, 1, 0],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 1, 0],
-  [1, 1, 1, 0, 0],
-];
-
-const LETTER_E = [
-  [1, 1, 1, 1, 0],
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 1, 1, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 1, 1, 1, 0],
-];
-
-const LETTER_N = [
-  [1, 0, 0, 0, 1],
-  [1, 1, 0, 0, 1],
-  [1, 0, 1, 0, 1],
-  [1, 0, 0, 1, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-];
-
-const LETTER_L = [
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0],
-  [1, 1, 1, 1, 1],
-];
-
-const LETTER_I = [
-  [1, 1, 1, 0, 0],
-  [0, 1, 0, 0, 0],
-  [0, 1, 0, 0, 0],
-  [0, 1, 0, 0, 0],
-  [0, 1, 0, 0, 0],
-  [0, 1, 0, 0, 0],
-  [1, 1, 1, 0, 0],
-];
-
-const LETTER_S = [
-  [0, 1, 1, 1, 0],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 0],
-  [0, 1, 1, 1, 0],
-  [0, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [0, 1, 1, 1, 0],
-];
-
-const LETTER_H = [
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-  [1, 0, 0, 0, 1],
-];
-
-// ─── Render a letter at a given offset ───────────────────────────────────────
-function Letter({
-  grid, ox, oy, p, b,
+// ─── Render one word at (ox, oy) with given colors ────────────────────────────
+function Word({
+  letters, ox, oy, p, gap, face, hi,
 }: {
-  grid: number[][];
+  letters: number[][][];
   ox: number; oy: number;
-  p: number; b: number;
+  p: number; gap: number;
+  face: string; hi: string;
 }) {
-  return (
-    <>
-      {grid.flatMap((row, ri) =>
-        row.map((v, ci) =>
-          v ? (
-            <PixelBlock
-              key={`${ri}-${ci}`}
-              x={ox + ci * p}
+  const nodes: React.ReactNode[] = [];
+  letters.forEach((grid, li) => {
+    const lx = ox + li * (5 * p + gap);
+    grid.forEach((row, ri) => {
+      row.forEach((v, ci) => {
+        if (v) {
+          nodes.push(
+            <Block
+              key={`${li}-${ri}-${ci}`}
+              x={lx + ci * p}
               y={oy + ri * p}
               p={p}
-              b={b}
+              face={face}
+              hi={hi}
             />
-          ) : null
-        )
-      )}
-    </>
-  );
+          );
+        }
+      });
+    });
+  });
+  return <>{nodes}</>;
 }
 
-// ─── "GOOD ENGLISH" wordmark — configurable block size ───────────────────────
-function PixelWordmark({
-  p = 5,     // block pixel size
-  gap = p,   // gap between letters
-}: {
-  p?: number;
-  gap?: number;
+// ─── Core wordmark SVG builder ────────────────────────────────────────────────
+// p  = block size in px
+// gap = spacing between letters within a word
+// Returns a self-contained <svg> with dark rounded background
+
+function Wordmark({ p, gap, padX, padY, r }: {
+  p: number;
+  gap: number;
+  padX: number;
+  padY: number;
+  r: number;
 }) {
-  const b = Math.max(1, Math.round(p / 4));
-  const rows = 7;
-  const cols = 5;
-  const letterW = cols * p;
-  const spaceW = Math.round(p * 0.8);
+  const letterW = 5 * p;
+  const letterH = 7 * p;
 
-  // "GOOD ENGLISH" = G O O D [space] E N G L I S H
-  const letters = [
-    LETTER_G, LETTER_O, LETTER_O, LETTER_D,
-    null, // space
-    LETTER_E, LETTER_N, LETTER_G, LETTER_L, LETTER_I, LETTER_S, LETTER_H,
-  ];
+  // Word widths
+  const goodW   = GOOD.length    * (letterW + gap) - gap;
+  const engW    = ENGLISH.length * (letterW + gap) - gap;
+  const wordGap = Math.round(p * 1.6); // gap between GOOD and ENGLISH
 
-  let cursor = 0;
-  const positions: { grid: number[][] | null; x: number }[] = letters.map((grid) => {
-    const x = cursor;
-    cursor += grid === null ? spaceW + gap : letterW + gap;
-    return { grid, x };
-  });
+  const contentW = goodW + wordGap + engW + 1; // +1 for shadow
+  const contentH = letterH + 1;
 
-  const totalW = cursor - gap + b;
-  const totalH = rows * p + b;
+  const bgW = contentW + padX * 2;
+  const bgH = contentH + padY * 2;
 
   return (
     <svg
-      viewBox={`0 0 ${totalW} ${totalH}`}
+      viewBox={`0 0 ${bgW} ${bgH}`}
       xmlns="http://www.w3.org/2000/svg"
       aria-label="GOOD ENGLISH"
       role="img"
     >
-      {positions.map(({ grid, x }, i) =>
-        grid ? (
-          <Letter key={i} grid={grid} ox={x} oy={0} p={p} b={b} />
-        ) : null
-      )}
+      {/* Dark background */}
+      <rect width={bgW} height={bgH} rx={r} ry={r} fill="#111518" />
+      {/* GOOD — gray */}
+      <Word
+        letters={GOOD}
+        ox={padX}
+        oy={padY}
+        p={p} gap={gap}
+        face="#7A8694"
+        hi="#A4B0BC"
+      />
+      {/* ENGLISH — light */}
+      <Word
+        letters={ENGLISH}
+        ox={padX + goodW + wordGap}
+        oy={padY}
+        p={p} gap={gap}
+        face="#C0CDD8"
+        hi="#E2EBF2"
+      />
+    </svg>
+  );
+}
+
+// ─── Small "G" icon only (collapsed sidebar) ──────────────────────────────────
+function GIcon({ height }: { height: number }) {
+  const p = 3;
+  const vw = 5 * p + 1;  // 16
+  const vh = 7 * p + 1;  // 22
+  const w  = Math.round(height * (vw / vh));
+  return (
+    <svg
+      width={w} height={height}
+      viewBox={`0 0 ${vw} ${vh}`}
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="G"
+      role="img"
+    >
+      <Word letters={[G]} ox={0} oy={0} p={p} gap={0} face="#C0CDD8" hi="#E2EBF2" />
     </svg>
   );
 }
@@ -205,77 +144,56 @@ function PixelWordmark({
 // ─── Public components ────────────────────────────────────────────────────────
 
 /**
- * Small pixel "G" icon — for collapsed sidebar / mobile bar.
- * height prop controls rendered size; SVG scales cleanly.
+ * Small inline logo — matches the opencode header logo style.
+ * Used in mobile top bar and sidebar expanded state.
+ * Rendered at natural SVG size (auto width × ~22px tall).
  */
-export function GoodEnglishIcon({ height = 28 }: { height?: number }) {
-  const p = 4;
-  const b = 1;
-  const vw = 5 * p + b;  // 21
-  const vh = 7 * p + b;  // 29
-  const w = Math.round(height * (vw / vh));
-
+export function LogoSmall() {
+  // p=2, gap=2 → letters 10×14px, BG ~144×22px
   return (
-    <svg
-      width={w}
-      height={height}
-      viewBox={`0 0 ${vw} ${vh}`}
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Good English"
-      role="img"
-    >
-      <Letter grid={LETTER_G} ox={0} oy={0} p={p} b={b} />
-    </svg>
+    <span className="inline-flex items-center" style={{ lineHeight: 0 }}>
+      <Wordmark p={2} gap={2} padX={5} padY={4} r={3} />
+    </span>
   );
 }
 
 /**
- * Sidebar logo:
- * - collapsed → small G icon only
- * - expanded → G icon + "Good English" in serif font
+ * Large dashboard hero wordmark.
+ * p=5, BG ~348×56px — scales with container.
+ */
+export function LogoLarge() {
+  return (
+    <div className="w-full max-w-[360px]" style={{ lineHeight: 0 }}>
+      <Wordmark p={5} gap={4} padX={10} padY={8} r={6} />
+    </div>
+  );
+}
+
+/**
+ * Sidebar logo slot:
+ * - collapsed → small "G" icon
+ * - expanded  → small full wordmark
  */
 export function SidebarLogo({ collapsed }: { collapsed: boolean }) {
-  if (collapsed) {
-    return <GoodEnglishIcon height={26} />;
-  }
-  return (
-    <span className="flex items-center gap-3">
-      <GoodEnglishIcon height={26} />
-      <span
-        className="text-[15px] font-bold tracking-[0.15em] uppercase text-[var(--foreground)]"
-        style={{ fontFamily: 'var(--font-serif), Georgia, serif' }}
-      >
-        Good English
-      </span>
-    </span>
-  );
+  if (collapsed) return <GIcon height={22} />;
+  return <LogoSmall />;
 }
 
 /**
- * Mobile top bar logo (icon + text, compact).
+ * Mobile top-bar logo (always full wordmark, small).
  */
 export function TopBarLogo() {
-  return (
-    <span className="flex items-center gap-2.5">
-      <GoodEnglishIcon height={22} />
-      <span
-        className="text-sm font-bold tracking-[0.12em] uppercase text-[var(--foreground)]"
-        style={{ fontFamily: 'var(--font-serif), Georgia, serif' }}
-      >
-        Good English
-      </span>
-    </span>
-  );
+  return <LogoSmall />;
 }
 
 /**
- * Full pixel-art wordmark for the dashboard hero.
- * Scales fluidly with the container width.
+ * Dashboard h1 pixel wordmark.
  */
 export function GoodEnglishHeading() {
   return (
-    <div className="w-full max-w-[480px]">
-      <PixelWordmark p={5} gap={4} />
+    <div>
+      <h1 className="sr-only">Good English</h1>
+      <LogoLarge />
     </div>
   );
 }

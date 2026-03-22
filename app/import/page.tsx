@@ -23,9 +23,6 @@ import {
   Link as LinkIcon,
   Loader2,
   Sparkles,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
   Check,
   X,
   AlertCircle,
@@ -45,6 +42,8 @@ type UrlContentType =
   | null;
 
 const MAX_BATCH_URLS = 10;
+const JOB_PANEL_VISIBLE_COUNT = 5;
+const JOB_REFRESH_INTERVAL_MS = 2500;
 
 type FetchedSource = MaterialSourceItem & {
   warning?: string;
@@ -113,12 +112,10 @@ export default function ImportPage() {
   const [step, setStep] = useState<ImportStep>("input");
   const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
   const [error, setError] = useState("");
-  const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [selectedWords, setSelectedWords] = useState<Set<number>>(new Set());
   const [selectedPatterns, setSelectedPatterns] = useState<Set<number>>(
     new Set(),
   );
-  const [showLibrary, setShowLibrary] = useState(false);
   const [extractingMsg, setExtractingMsg] = useState(
     "AI 正在分析内容，提取词汇和句型...",
   );
@@ -199,7 +196,7 @@ export default function ImportPage() {
 
     const timer = window.setInterval(() => {
       refreshJobs().catch(() => {});
-    }, 5000);
+    }, JOB_REFRESH_INTERVAL_MS);
 
     return () => {
       cancelled = true;
@@ -209,8 +206,7 @@ export default function ImportPage() {
   }, [user]);
 
   async function loadMaterials() {
-    const mats = await getAllMaterials();
-    setMaterials(mats);
+    await getAllMaterials();
   }
 
   async function fetchAndExtract(
@@ -440,6 +436,7 @@ export default function ImportPage() {
 
   function renderQueuedJobsPanel(showHeader = true) {
     if (queuedJobs.length === 0) return null;
+    const hasOverflow = queuedJobs.length > JOB_PANEL_VISIBLE_COUNT;
 
     return (
       <div className="space-y-4">
@@ -452,7 +449,12 @@ export default function ImportPage() {
           </div>
         )}
 
-        <div className="space-y-2">
+        <div
+          className={cn(
+            "space-y-2",
+            hasOverflow && "max-h-[26rem] overflow-y-auto pr-1",
+          )}
+        >
           {queuedJobs.map((job) => (
             <div
               key={job.id}
@@ -506,52 +508,12 @@ export default function ImportPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6 gap-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold">素材导入</h1>
-          <p className="text-sm text-[var(--muted-foreground)] hidden sm:block">
-            粘贴内容或 URL，AI 自动提取词汇和句型
-          </p>
-        </div>
-        <button
-          onClick={() => setShowLibrary(!showLibrary)}
-          className="flex items-center gap-1 rounded-lg bg-[var(--secondary)] px-3 py-2 text-sm hover:bg-[var(--muted)] transition-colors shrink-0"
-        >
-          素材库 ({materials.length})
-          {showLibrary ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-        </button>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">素材导入</h1>
+        <p className="text-sm text-[var(--muted-foreground)] hidden sm:block">
+          粘贴内容或 URL，AI 自动提取词汇和句型
+        </p>
       </div>
-
-      {/* Material Library */}
-      {showLibrary && materials.length > 0 && (
-        <div className="mb-6 space-y-2">
-          {materials.map((mat) => (
-            <div
-              key={mat.id}
-              className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">{mat.title}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  {mat.extractedWordIds.length} 词 ·{" "}
-                  {mat.extractedPatternIds.length} 句型 ·{" "}
-                  {new Date(mat.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <button
-                onClick={() => handleDeleteMaterial(mat.id)}
-                className="ml-2 p-1 text-[var(--muted-foreground)] hover:text-[var(--destructive)]"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Input Step */}
       {step === "input" && (

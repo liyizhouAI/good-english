@@ -33,7 +33,7 @@ export default function RootLayout({
       <body className="antialiased">
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-12 md:pt-6">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-[50px] md:pt-6">
             {children}
           </main>
         </div>

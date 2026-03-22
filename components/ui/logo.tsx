@@ -150,7 +150,15 @@ function Word({
 }
 
 // ─── Core SVG wordmark (always transparent background) ───────────────────────
-function Wordmark({ p, gap }: { p: number; gap: number }) {
+function Wordmark({
+  p,
+  gap,
+  fixedHeight,
+}: {
+  p: number;
+  gap: number;
+  fixedHeight?: number;
+}) {
   const lw = 5 * p;
   const lh = 7 * p;
   const goodW = GOOD.length * (lw + gap) - gap;
@@ -165,7 +173,7 @@ function Wordmark({ p, gap }: { p: number; gap: number }) {
       xmlns="http://www.w3.org/2000/svg"
       aria-label="GOOD ENGLISH"
       role="img"
-      width="100%"
+      {...(fixedHeight ? { height: fixedHeight } : { width: "100%" })}
       style={{ display: "block" }}
     >
       <Word
@@ -190,18 +198,11 @@ function Wordmark({ p, gap }: { p: number; gap: number }) {
   );
 }
 
-// ─── Banner logo: top-bar, 缩小70% → display at 30% of natural p=2 size (~39px)
+// ─── Banner logo: top-bar, height-fixed to match nav icon row (~22px)
 export function LogoBanner() {
   return (
-    <span
-      style={{
-        display: "inline-block",
-        width: "39px",
-        lineHeight: 0,
-        flexShrink: 0,
-      }}
-    >
-      <Wordmark p={2} gap={2} />
+    <span style={{ display: "inline-block", lineHeight: 0, flexShrink: 0 }}>
+      <Wordmark p={3} gap={2} fixedHeight={22} />
     </span>
   );
 }

@@ -18,6 +18,8 @@ import { nanoid } from "nanoid";
 
 const execFileAsync = promisify(execFile);
 
+loadLocalEnv();
+
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   "https://twjsspsplskqsgmnegrk.supabase.co";
@@ -31,7 +33,7 @@ const ARCHIVE_DIR =
   process.env.GOOD_ENGLISH_ARCHIVE_DIR ||
   path.join(process.cwd(), "DB");
 const JOB_LIMIT = Number(process.env.GOOD_ENGLISH_JOB_LIMIT || 3);
-const POLL_INTERVAL_MS = Number(process.env.GOOD_ENGLISH_POLL_INTERVAL_MS || 15000);
+const POLL_INTERVAL_MS = Number(process.env.GOOD_ENGLISH_POLL_INTERVAL_MS || 60000);
 const WATCH_MODE = process.argv.includes("--watch");
 
 if (!SERVICE_ROLE_KEY) {
@@ -49,6 +51,38 @@ mkdirSync(ARCHIVE_DIR, { recursive: true });
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
+
+function loadLocalEnv() {
+  const envFiles = [".env.local", ".env"];
+
+  for (const fileName of envFiles) {
+    const fullPath = path.join(process.cwd(), fileName);
+    if (!existsSync(fullPath)) continue;
+
+    const content = readFileSync(fullPath, "utf8");
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const equalsIndex = line.indexOf("=");
+      if (equalsIndex <= 0) continue;
+
+      const key = line.slice(0, equalsIndex).trim();
+      let value = line.slice(equalsIndex + 1).trim();
+
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      if (!process.env[key]) {
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 function slugify(input) {
   const ascii = input

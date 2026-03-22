@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -16,19 +16,24 @@ export function useAuth() {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function signInWithEmail(email: string) {
+  async function signInWithGoogle() {
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
       options: {
-        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : '',
+        redirectTo:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/callback`
+            : "",
       },
     });
     return { error };
@@ -39,5 +44,5 @@ export function useAuth() {
     await supabase.auth.signOut();
   }
 
-  return { user, loading, signInWithEmail, signOut };
+  return { user, loading, signInWithGoogle, signOut };
 }

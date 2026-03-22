@@ -20,15 +20,14 @@ export async function POST(req: Request) {
     return new Response(`Provider error: ${e}`, { status: 500 });
   }
 
-  try {
-    const result = streamText({
-      model,
-      system:
-        systemPrompt || "You are a helpful English tutor. Respond concisely.",
-      messages,
-    });
-    return result.toTextStreamResponse();
-  } catch (e) {
-    return new Response(`Model error: ${e}`, { status: 500 });
-  }
+  const result = streamText({
+    model,
+    system:
+      systemPrompt || "You are a helpful English tutor. Respond concisely.",
+    messages,
+    onError: (e) => {
+      console.error("[chat] stream error:", JSON.stringify(e));
+    },
+  });
+  return result.toTextStreamResponse();
 }

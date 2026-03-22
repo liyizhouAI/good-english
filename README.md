@@ -2,6 +2,10 @@
 
 > 不是"学英语"，是从你认为好的英文内容中提取精华，用 AI 模拟真实硅谷场景对话，系统恢复高级英语表达和采访能力。
 
+**线上地址**：https://good-english-two.vercel.app
+
+---
+
 ## 核心理念
 
 博士学历英语荒废多年（约四级水平），目标：去硅谷与 AI 领域牛人交流。
@@ -12,6 +16,7 @@
 2. 用 SM-2 间隔重复算法管理复习计划
 3. AI 扮演 VC / 创始人 / 研究员，模拟真实硅谷对话
 4. 实时纠错 + 流利度评分
+5. 语音输入（OpenAI Whisper）
 
 ---
 
@@ -19,10 +24,12 @@
 
 | 层级 | 技术 |
 |------|------|
-| 框架 | Next.js 15 (App Router) + React 19 + TypeScript |
+| 框架 | Next.js 16 (App Router) + React 19 + TypeScript |
 | 样式 | Tailwind CSS v4（深色主题） |
-| 存储 | Dexie.js (IndexedDB，纯本地，零服务器成本) |
+| 本地存储 | Dexie.js (IndexedDB) |
+| 云端同步 | Supabase（Auth + PostgreSQL） |
 | AI | Vercel AI SDK v6（多 Provider 抽象层） |
+| 语音识别 | OpenAI Whisper (`/api/transcribe`) |
 | 部署 | Vercel |
 
 ---
@@ -30,150 +37,143 @@
 ## 四大核心功能
 
 ### 1. 素材导入 & 智能提取（`/import`）
-
 - 粘贴文本 或 输入 URL 自动抓取（服务端代理，绕过 CORS）
 - AI 自动提取：高级词汇 / 可复用句型 / 关键短语
 - 提取结果可勾选编辑后存入学习库
-- 素材库支持浏览和删除
-
-**提取 API**：`POST /api/extract` → LLM 返回结构化 JSON `{words[], patterns[], keyPhrases[]}`
 
 ### 2. 词汇恢复系统（`/vocabulary`）
-
-- 分类词库：日常 / 商业 / AI科技 / 自定义
-- **SM-2 间隔重复**：Again(重来) / Hard(困难) / Good(记住) / Easy(简单)
+- SM-2 间隔重复：Again / Hard / Good / Easy
 - 闪卡复习：点击翻转，查看中文释义 + 例句 + 语境
-- 待复习词汇琥珀色高亮提示
+- 待复习词汇高亮提示
 
 ### 3. AI 对话模拟器（`/chat`）
-
-**4 个角色**：
-- Sarah Chen — VC Partner（Sequoia，投资人视角）
-- Marcus Thompson — AI Startup Founder（连续创业者）
-- Dr. Emily Park — AI Researcher（DeepMind，学术风格）
-- Alex Rivera — Product Manager（Google，产品思维）
-
-**5 个场景**：自我介绍 / AI趋势讨论 / 创业商业交流 / 社交寒暄 / 媒体采访
-
-**实时反馈**（每轮对话后）：
-- 纠错：原句 → 建议改法 + 中文解释
-- 评分：流利度 / 词汇量 / 语法（各 1-10 分）
+- 4 个角色：VC Partner / AI创始人 / AI研究员 / PM
+- 5 个场景：自我介绍 / AI趋势 / 创业商业 / 社交寒暄 / 媒体采访
+- 实时纠错 + 流利度/词汇/语法三维评分
+- 支持语音输入（需配置 OpenAI Key）
 
 ### 4. 句型训练（`/patterns`）
-
-- 按场景分类：自我介绍 / AI讨论 / 商业 / 社交 / 采访
-- 融入 SM-2 复习系统，智能安排复习时间
+- 按场景分类，融入 SM-2 复习系统
 - 闪卡正面：英文句型，背面：中文含义 + 例句
 
 ---
 
 ## AI Provider 配置
 
-多 Provider 支持，API Key 存 localStorage（不上传服务器）。
+Settings 页面（`/settings`）配置，支持多个 Provider 自由切换。
 
-在 **设置页面** (`/settings`) 配置，支持：
+| Provider | 推荐模型 | 用途 |
+|----------|---------|------|
+| 阿里云百炼（Qwen） | qwen-plus | AI 对话（推荐，便宜） |
+| MiniMax | MiniMax-M2.7-highspeed | AI 对话（国内快） |
+| Kimi（月之暗面） | kimi-k2.5 | AI 对话 |
+| OpenAI | gpt-4o | AI 对话 + **语音识别（必须）** |
+| OpenRouter | claude-sonnet-4-6 | AI 对话（多模型聚合） |
 
-| Provider | 默认模型 | Base URL |
-|----------|---------|---------|
-| 阿里云百炼（Qwen） | qwen-plus | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| OpenRouter | claude-3.5-sonnet | `https://openrouter.ai/api/v1` |
-| MiniMax | abab6.5s-chat | `https://api.minimax.chat/v1` |
-| Kimi（月之暗面） | moonshot-v1-8k | `https://api.moonshot.cn/v1` |
+> **语音输入**：固定使用 OpenAI Whisper，需要单独配置 OpenAI API Key。AI 对话可用任意 Provider。
 
-> **推荐**：用阿里云百炼（qwen-plus），成本低，中文纠错效果好。
+### API Key 跨设备同步
+用 Google 账号登录后，API Key 自动加密同步到 Supabase，换设备登录即恢复。
+
+---
+
+## 基础设施 & 账号
+
+### Vercel
+- 项目：`liyizhous-projects/good-english`
+- 生产域名：`https://good-english-two.vercel.app`
+- 部署命令：
+  ```bash
+  vercel deploy --prod --token YOUR_TOKEN --scope liyizhous-projects
+  ```
+
+### Supabase
+- 项目 URL：`https://twjsspsplskqsgmnegrk.supabase.co`
+- Region：Northeast Asia (Seoul)
+- 数据库表：`user_settings`（用于 API Key 云端同步）
+- Auth Provider：Google OAuth（需在 Google Cloud Console 配置）
+
+#### Supabase SQL（首次初始化，已执行）
+```sql
+CREATE TABLE user_settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  settings_data TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id)
+);
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "self_only" ON user_settings
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### Google OAuth（待完成配置）
+1. Google Cloud Console → 新建项目 → OAuth Consent Screen → Credentials
+2. Authorized redirect URI：`https://twjsspsplskqsgmnegrk.supabase.co/auth/v1/callback`
+3. 将 Client ID + Secret 填入 Supabase → Authentication → Providers → Google
+
+### 环境变量
+`.env.local`（本地开发用）：
+```
+NEXT_PUBLIC_SUPABASE_URL=https://twjsspsplskqsgmnegrk.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_EBofpvQB7hTJdWvllQdVIw_oUkuWvUa
+```
+Vercel 生产环境已配置同名变量。
 
 ---
 
 ## 本地开发
 
 ```bash
-# 安装依赖
 npm install
-
-# 启动开发服务器（端口 3456）
-npm run dev
-
-# 构建生产版本
-npm run build
+npm run dev        # 启动开发服务器（端口 3456）
+npm run build      # 构建生产版本
 ```
-
-打开 http://localhost:3456 ，进入设置页配置 AI Provider API Key 即可使用。
-
----
-
-## 数据库结构（IndexedDB via Dexie）
-
-```
-words       — 词汇（SM-2字段 + 分类 + 来源素材）
-patterns    — 句型（SM-2字段 + 场景 + 来源素材）
-materials   — 导入素材（原文 + 提取结果）
-conversations — 对话历史
-userStats   — 学习统计
-```
-
-全部存在浏览器 IndexedDB，关闭浏览器数据保留，清除浏览器数据会丢失。**建议定期 JSON 导出备份**（待实现）。
 
 ---
 
 ## 项目结构
 
 ```
-Good English/
-├── app/
-│   ├── page.tsx              # 仪表盘（实时统计）
-│   ├── import/page.tsx       # 素材导入 & 提取
-│   ├── vocabulary/page.tsx   # 词汇复习系统
-│   ├── chat/page.tsx         # AI 对话模拟
-│   ├── patterns/page.tsx     # 句型训练
-│   ├── settings/page.tsx     # AI Provider 设置
-│   └── api/
-│       ├── chat/route.ts     # 流式对话 API
-│       ├── extract/route.ts  # 素材提取 API
-│       ├── evaluate/route.ts # 练习评估 API
-│       └── fetch-url/route.ts # URL 抓取代理
-├── lib/
-│   ├── ai/
-│   │   ├── providers.ts      # 多 Provider 工厂
-│   │   └── prompts.ts        # 所有 AI 提示词
-│   ├── db/
-│   │   ├── database.ts       # Dexie 数据库定义
-│   │   ├── vocabulary.ts     # 词汇 CRUD
-│   │   ├── patterns.ts       # 句型 CRUD
-│   │   └── materials.ts      # 素材 CRUD
-│   ├── hooks/
-│   │   └── use-settings.ts   # Provider 配置 Hook
-│   ├── utils/
-│   │   └── sm2.ts            # SM-2 间隔重复算法
-│   └── types/                # TypeScript 类型定义
-└── components/
-    └── layout/sidebar.tsx    # 侧边栏导航
+app/
+├── page.tsx                  # 仪表盘
+├── import/page.tsx           # 素材导入 & 提取
+├── vocabulary/page.tsx       # 词汇复习
+├── chat/page.tsx             # AI 对话模拟
+├── patterns/page.tsx         # 句型训练
+├── settings/page.tsx         # AI Provider 配置 + 登录
+├── auth/callback/route.ts    # Google OAuth 回调
+└── api/
+    ├── chat/route.ts         # 流式对话
+    ├── extract/route.ts      # 素材提取
+    ├── evaluate/route.ts     # 练习评估
+    ├── fetch-url/route.ts    # URL 抓取代理
+    └── transcribe/route.ts   # 语音识别（OpenAI Whisper）
+
+lib/
+├── ai/providers.ts           # 多 Provider 工厂
+├── ai/prompts.ts             # AI 提示词
+├── db/                       # Dexie IndexedDB
+├── hooks/use-settings.ts     # 设置 Hook（含云端同步）
+├── hooks/use-auth.ts         # Google Auth Hook
+├── supabase/client.ts        # Supabase 客户端
+├── supabase/settings-sync.ts # 云端设置读写
+└── types/                    # TypeScript 类型
+
+components/
+├── layout/sidebar.tsx        # 侧边栏（响应式，支持折叠）
+└── auth/login-card.tsx       # Google 登录卡片
 ```
 
 ---
 
-## SM-2 算法说明
+## 待完成
 
-每次复习后选择难度，系统计算下次复习时间：
-
-| 评级 | 说明 | 效果 |
-|------|------|------|
-| Again | 完全忘记 | 间隔重置为 1 天 |
-| Hard | 勉强记住 | 间隔增长缓慢 |
-| Good | 正常记住 | 间隔正常增长 |
-| Easy | 轻松记住 | 间隔大幅增长，提升难度因子 |
-
-连续 Easy 评级会让复习间隔指数级增长（1天→6天→15天→...），只需复习真正困难的内容。
-
----
-
-## 后续迭代方向
-
-- [ ] 数据 JSON 导出/导入（备份防丢失）
-- [ ] 仪表盘：每日打卡连续记录、学习曲线图
-- [ ] 语音输入（Web Speech API）
-- [ ] 句型填空练习模式
-- [ ] YouTube 字幕自动提取（youtube-transcript）
-- [ ] 移动端优化
+- [ ] Google OAuth 配置（Google Cloud Console → Supabase）
+- [ ] 数据 JSON 导出/导入备份
+- [ ] 千问 Paraformer 语音识别（验证 compatible-mode 是否支持直传）
+- [ ] 仪表盘学习曲线图、连续打卡
+- [ ] YouTube 字幕自动提取
 - [ ] PWA 离线支持
 
 ---

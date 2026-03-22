@@ -404,10 +404,10 @@ export default function ImportPage() {
           new Set(data.patterns?.map((_: unknown, i: number) => i) ?? []),
         );
         setStep("review");
-    } catch (e) {
-      setError(formatImportError(e) || "提取失败");
-      setStep("input");
-    }
+      } catch (e) {
+        setError(formatImportError(e) || "提取失败");
+        setStep("input");
+      }
       return;
     }
 
@@ -425,7 +425,9 @@ export default function ImportPage() {
     } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      setError("URL 导入需要先登录 Google，这样 Mac mini 才能把结果写回你的 Supabase");
+      setError(
+        "URL 导入需要先登录 Google，这样 Mac mini 才能把结果写回你的 Supabase",
+      );
       setStep("input");
       return;
     }
@@ -515,7 +517,9 @@ export default function ImportPage() {
       keyPhrases: extraction.keyPhrases || [],
       tags:
         mode === "url"
-          ? Array.from(new Set(fetchedSources.map((source) => source.contentType)))
+          ? Array.from(
+              new Set(fetchedSources.map((source) => source.contentType)),
+            )
           : [],
     });
 
@@ -590,8 +594,7 @@ export default function ImportPage() {
                     job.status === "completed" &&
                       "bg-emerald-500/10 text-emerald-400",
                     job.status === "failed" && "bg-red-500/10 text-red-400",
-                    job.status === "processing" &&
-                      "bg-sky-500/10 text-sky-400",
+                    job.status === "processing" && "bg-sky-500/10 text-sky-400",
                     job.status === "pending" &&
                       "bg-amber-500/10 text-amber-400",
                   )}
@@ -656,7 +659,7 @@ export default function ImportPage() {
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               placeholder="粘贴英文推文、文章、逐字稿等内容..."
-              className="w-full h-64 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm outline-none focus:border-[var(--primary)] resize-none transition-colors"
+              className="w-full h-64 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-base outline-none focus:border-[var(--primary)] resize-none transition-colors"
             />
           ) : (
             <textarea
@@ -666,7 +669,7 @@ export default function ImportPage() {
                 "https://x.com/...\nhttps://zhihu.com/...\nhttps://mp.weixin.qq.com/..."
               }
               rows={8}
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm outline-none focus:border-[var(--primary)] resize-none transition-colors leading-relaxed overflow-x-hidden [word-break:break-all]"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-base outline-none focus:border-[var(--primary)] resize-none transition-colors leading-relaxed overflow-x-hidden [word-break:break-all]"
             />
           )}
 
@@ -752,7 +755,8 @@ export default function ImportPage() {
           {mode === "url" && !authLoading && !user && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3">
               <p className="text-sm text-amber-300">
-                URL 导入会把任务发给 Mac mini 处理，所以需要先登录 Google，系统才能把结果写回你自己的 Supabase。
+                URL 导入会把任务发给 Mac mini 处理，所以需要先登录
+                Google，系统才能把结果写回你自己的 Supabase。
               </p>
               <button
                 onClick={async () => {
@@ -772,15 +776,14 @@ export default function ImportPage() {
 
           {mode === "url" && authLoading && (
             <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
-              页面还在恢复登录状态；如果你已经登录成功，也可以直接点“提交抓取任务”，系统会再次向 Supabase 确认当前账号。
+              页面还在恢复登录状态；如果你已经登录成功，也可以直接点“提交抓取任务”，系统会再次向
+              Supabase 确认当前账号。
             </div>
           )}
 
           <button
             onClick={handleExtract}
-            disabled={
-              mode === "text" ? !textInput.trim() : urlSubmitDisabled
-            }
+            disabled={mode === "text" ? !textInput.trim() : urlSubmitDisabled}
             className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             <Sparkles className="h-4 w-4" />
@@ -834,7 +837,8 @@ export default function ImportPage() {
           <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
             <h3 className="font-semibold">已提交到 Mac mini 抓取队列</h3>
             <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-              Mac mini 会调用 Content Fetcher 抓全文，整理 Markdown，提取词汇和句型，然后直接写入 Supabase。
+              Mac mini 会调用 Content Fetcher 抓全文，整理
+              Markdown，提取词汇和句型，然后直接写入 Supabase。
             </p>
           </div>
 
@@ -875,7 +879,10 @@ export default function ImportPage() {
               </p>
               <p className="mt-1 text-xs text-[var(--muted-foreground)]">
                 {fetchedSources.some((source) => source.archiveRelativePath)
-                  ? `归档目录：DB / ${fetchedSources.find((source) => source.archiveRelativePath)?.archiveRelativePath?.split("/").pop()}`
+                  ? `归档目录：DB / ${fetchedSources
+                      .find((source) => source.archiveRelativePath)
+                      ?.archiveRelativePath?.split("/")
+                      .pop()}`
                   : "当前环境未返回本地归档路径"}
               </p>
             </div>

@@ -14,10 +14,18 @@ create table if not exists user_learning_data (
 
 alter table user_learning_data enable row level security;
 
-create policy "Users manage own learning data"
-  on user_learning_data for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where tablename = 'user_learning_data'
+    and policyname = 'Users manage own learning data'
+  ) then
+    create policy "Users manage own learning data"
+      on user_learning_data for all
+      using (auth.uid() = user_id)
+      with check (auth.uid() = user_id);
+  end if;
+end $$;
 
 create table if not exists content_fetch_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -36,10 +44,18 @@ create index if not exists idx_content_fetch_jobs_status_requested_at
 
 alter table content_fetch_jobs enable row level security;
 
-create policy "Users manage own fetch jobs"
-  on content_fetch_jobs for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where tablename = 'content_fetch_jobs'
+    and policyname = 'Users manage own fetch jobs'
+  ) then
+    create policy "Users manage own fetch jobs"
+      on content_fetch_jobs for all
+      using (auth.uid() = user_id)
+      with check (auth.uid() = user_id);
+  end if;
+end $$;
 `.trim();
 
 export async function GET() {

@@ -14,9 +14,9 @@ const VOICE_PROVIDERS = [
   },
   {
     id: "minimax" as const,
-    name: "MiniMax ASR",
-    desc: "MiniMax ASR API 格式与 OpenAI 不兼容，暂不支持，敬请期待",
-    supported: false,
+    name: "MiniMax 语音识别",
+    desc: "MiniMax speech-01 模型，中英文识别，需要 MiniMax API Key",
+    supported: true,
   },
 ];
 

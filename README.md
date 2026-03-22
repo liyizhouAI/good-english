@@ -26,8 +26,8 @@
 |------|------|
 | 框架 | Next.js 16 (App Router) + React 19 + TypeScript |
 | 样式 | Tailwind CSS v4（深色主题） |
-| 本地存储 | Dexie.js (IndexedDB) |
-| 云端同步 | Supabase（Auth + PostgreSQL） |
+| 本地缓存 | Dexie.js (IndexedDB) |
+| 云端主存储 | Supabase（Auth + PostgreSQL） |
 | AI | Vercel AI SDK v6（多 Provider 抽象层） |
 | 语音识别 | OpenAI Whisper (`/api/transcribe`) |
 | 部署 | Vercel |
@@ -37,14 +37,16 @@
 ## 四大核心功能
 
 ### 1. 素材导入 & 智能提取（`/import`）
-- 粘贴文本 或 输入 URL 自动抓取（服务端代理，绕过 CORS）
+- 粘贴文本直接 AI 提取；URL 写入 Supabase 抓取队列，由常驻 Mac mini 调用 Content Fetcher skill 处理
 - AI 自动提取：高级词汇 / 可复用句型 / 关键短语
-- 提取结果可勾选编辑后存入学习库
+- 抓取完成后自动归档 Markdown 到项目内 `抓内容素材/`
+- Markdown、词汇、句型统一写回 Supabase，所有设备读取同一份云端数据
 
 ### 2. 词汇恢复系统（`/vocabulary`）
 - SM-2 间隔重复：Again / Hard / Good / Easy
 - 闪卡复习：点击翻转，查看中文释义 + 例句 + 语境
 - 待复习词汇高亮提示
+- **云端主存储**：打开即从 Supabase 拉取最新数据，复习/删除操作实时同步，多设备数据完全一致
 
 ### 3. AI 对话模拟器（`/chat`）
 - 4 个角色：VC Partner / AI创始人 / AI研究员 / PM
@@ -90,10 +92,15 @@ Settings 页面（`/settings`）配置，支持多个 Provider 自由切换。
 ### Supabase
 - 项目 URL：`https://twjsspsplskqsgmnegrk.supabase.co`
 - Region：Northeast Asia (Seoul)
-- 数据库表：`user_settings`（用于 API Key 云端同步）
+- 数据库表：
+  - `user_settings`：API Key 云端同步
+  - `user_learning_data`：词汇 / 句型 / 素材云端主存储（云端为准，多设备实时同步）
+  - `content_fetch_jobs`：URL 抓取任务队列（手机提交 URL，Mac mini 消费任务）
 - Auth Provider：Google OAuth（需在 Google Cloud Console 配置）
 
-#### Supabase SQL（首次初始化，已执行）
+#### Supabase SQL（已执行）
+
+**user_settings**（API Key 同步）：
 ```sql
 CREATE TABLE user_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -105,6 +112,47 @@ CREATE TABLE user_settings (
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "self_only" ON user_settings
   FOR ALL USING (auth.uid() = user_id);
+```
+
+**user_learning_data**（词汇/句型/素材云端主存储）：
+```sql
+create table if not exists user_learning_data (
+  user_id       uuid references auth.users primary key,
+  words_data    text not null default '[]',
+  patterns_data text not null default '[]',
+  materials_data text not null default '[]',
+  updated_at    timestamptz not null default now()
+);
+alter table user_learning_data enable row level security;
+create policy "Users manage own learning data"
+  on user_learning_data for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+**content_fetch_jobs**（URL 抓取队列）：
+```sql
+create table if not exists content_fetch_jobs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  source_url text not null,
+  status text not null default 'pending',
+  error text,
+  result_summary jsonb not null default '{}'::jsonb,
+  requested_at timestamptz not null default now(),
+  started_at timestamptz,
+  completed_at timestamptz
+);
+
+create index if not exists idx_content_fetch_jobs_status_requested_at
+  on content_fetch_jobs(status, requested_at);
+
+alter table content_fetch_jobs enable row level security;
+
+create policy "Users manage own fetch jobs"
+  on content_fetch_jobs for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 ```
 
 ### Google OAuth（待完成配置）
@@ -119,6 +167,40 @@ NEXT_PUBLIC_SUPABASE_URL=https://twjsspsplskqsgmnegrk.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_EBofpvQB7hTJdWvllQdVIw_oUkuWvUa
 ```
 Vercel 生产环境已配置同名变量。
+
+---
+
+## URL 导入工作流
+
+适用于核心场景：**手机上看到好内容，直接扔给 Good English。**
+
+1. 手机浏览器打开 `/import`，登录 Google，提交 URL
+2. 前端把 URL 写入 Supabase `content_fetch_jobs`
+3. Mac mini 常驻执行 `scripts/process-fetch-jobs.mjs --watch`
+4. 脚本调用本机 Content Fetcher skill 抓全文，生成 Markdown，并归档到 `抓内容素材/`
+5. 脚本调用 `/api/extract` 提取词汇 / 句型 / 关键短语
+6. 最终把 `materials_data / words_data / patterns_data` 直接写回 Supabase
+
+这样手机、Mac、其他设备都只认 Supabase，不依赖某一台设备的本地 IndexedDB。
+
+### Mac mini Worker
+
+初始化云端表：
+```bash
+SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY node scripts/setup-sync-table.mjs
+```
+
+启动常驻 worker（推荐）：
+```bash
+SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY npm run worker
+```
+
+手动扫一次队列（补救/调试用）：
+```bash
+SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY npm run worker:once
+```
+
+worker 默认使用 Supabase Realtime 监听新任务，并用 15 秒轻量轮询做兜底，不依赖每分钟 cron。
 
 ---
 
@@ -157,8 +239,14 @@ lib/
 ├── hooks/use-settings.ts     # 设置 Hook（含云端同步）
 ├── hooks/use-auth.ts         # Google Auth Hook
 ├── supabase/client.ts        # Supabase 客户端
-├── supabase/settings-sync.ts # 云端设置读写
+├── supabase/settings-sync.ts # API Key 云端读写
+├── supabase/data-sync.ts     # 学习数据云端主存储（push/pull，云端为准）
+├── server/content-fetcher.ts # 本地 Content Fetcher / Markdown 归档工具
 └── types/                    # TypeScript 类型
+
+scripts/
+├── setup-sync-table.mjs      # 初始化 Supabase 云端表
+└── process-fetch-jobs.mjs    # Mac mini 抓取队列 worker
 
 components/
 ├── layout/sidebar.tsx        # 侧边栏（响应式，支持折叠）
@@ -169,12 +257,10 @@ components/
 
 ## 待完成
 
-- [ ] Google OAuth 配置（Google Cloud Console → Supabase）
 - [ ] 数据 JSON 导出/导入备份
 - [ ] 千问 Paraformer 语音识别（验证 compatible-mode 是否支持直传）
 - [ ] 仪表盘学习曲线图、连续打卡
-- [ ] YouTube 字幕自动提取
-- [ ] PWA 离线支持
+- [ ] PWA 支持
 
 ---
 

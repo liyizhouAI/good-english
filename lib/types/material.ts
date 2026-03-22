@@ -1,9 +1,21 @@
+export interface MaterialSourceItem {
+  url: string;
+  title?: string;
+  contentType: string;
+  content: string;
+  markdown?: string;
+  archivePath?: string;
+  archiveRelativePath?: string;
+  fetchMethod?: string;
+}
+
 export interface MaterialRecord {
   id: string;
   title: string;
   content: string;
   sourceType: 'text' | 'url';
   sourceUrl?: string;
+  sourceItems?: MaterialSourceItem[];
   extractedWordIds: string[];
   extractedPatternIds: string[];
   keyPhrases: string[];

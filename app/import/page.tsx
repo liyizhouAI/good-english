@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { addWords } from "@/lib/db/vocabulary";
 import { addPatterns } from "@/lib/db/patterns";
 import {
@@ -9,7 +11,11 @@ import {
   getAllMaterials,
   deleteMaterial,
 } from "@/lib/db/materials";
-import type { ExtractionResult, MaterialRecord } from "@/lib/types/material";
+import type {
+  ExtractionResult,
+  MaterialRecord,
+  MaterialSourceItem,
+} from "@/lib/types/material";
 import type { WordCategory } from "@/lib/types/vocabulary";
 import type { PatternScenario } from "@/lib/types/pattern";
 import {
@@ -25,20 +31,67 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { createClient } from "@/lib/supabase/client";
+import { pullLearningData, pushLearningData } from "@/lib/supabase/data-sync";
 
 type ImportMode = "text" | "url";
-type ImportStep = "input" | "extracting" | "review" | "saved";
-type UrlContentType = "youtube" | "twitter" | "generic" | null;
+type ImportStep = "input" | "extracting" | "review" | "saved" | "queued";
+type UrlContentType =
+  | "youtube"
+  | "twitter"
+  | "zhihu"
+  | "wechat"
+  | "generic"
+  | null;
+
+const MAX_BATCH_URLS = 10;
+
+type FetchedSource = MaterialSourceItem & {
+  warning?: string;
+};
+
+type FetchJobStatus = "pending" | "processing" | "completed" | "failed";
+
+type QueuedJob = {
+  id: string;
+  source_url: string;
+  status: FetchJobStatus;
+  error?: string | null;
+  result_summary?: {
+    title?: string;
+    wordsCount?: number;
+    patternsCount?: number;
+  } | null;
+};
+
+function parseUrls(input: string): string[] {
+  return input
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.startsWith("http"))
+    .slice(0, MAX_BATCH_URLS);
+}
+
+function urlTypeLabel(type: UrlContentType): string {
+  if (type === "youtube") return "📹 YouTube";
+  if (type === "twitter") return "🐦 X / Twitter";
+  if (type === "zhihu") return "📚 知乎";
+  if (type === "wechat") return "💬 微信公众号";
+  return "🌐 网页";
+}
 
 function detectUrlType(url: string): UrlContentType {
   if (/(?:youtube\.com|youtu\.be)/i.test(url)) return "youtube";
   if (/(?:x\.com|twitter\.com)/i.test(url)) return "twitter";
+  if (/zhihu\.com/i.test(url)) return "zhihu";
+  if (/mp\.weixin\.qq\.com/i.test(url)) return "wechat";
   if (url.startsWith("http")) return "generic";
   return null;
 }
 
 export default function ImportPage() {
   const { getActiveProvider } = useSettings();
+  const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<ImportMode>("text");
   const [textInput, setTextInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
@@ -54,97 +107,226 @@ export default function ImportPage() {
   const [extractingMsg, setExtractingMsg] = useState(
     "AI 正在分析内容，提取词汇和句型...",
   );
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    url: string;
+  } | null>(null);
+  const [fetchedSources, setFetchedSources] = useState<FetchedSource[]>([]);
+  const [queuedJobs, setQueuedJobs] = useState<QueuedJob[]>([]);
+
+  const queuedJobIds = useMemo(
+    () => queuedJobs.map((job) => job.id),
+    [queuedJobs],
+  );
 
   useEffect(() => {
     loadMaterials();
   }, []);
+
+  useEffect(() => {
+    if (step !== "queued" || queuedJobIds.length === 0) return;
+
+    const supabase = createClient();
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
+
+    async function refreshJobs() {
+      const { data, error } = await supabase
+        .from("content_fetch_jobs")
+        .select("id, source_url, status, error, result_summary")
+        .in("id", queuedJobIds)
+        .order("requested_at", { ascending: true });
+
+      if (cancelled || error || !data) return;
+
+      const jobs = data as QueuedJob[];
+      setQueuedJobs(jobs);
+
+      const allDone = jobs.every(
+        (job) => job.status === "completed" || job.status === "failed",
+      );
+
+      if (allDone) {
+        await pullLearningData(supabase);
+        await loadMaterials();
+      }
+    }
+
+    refreshJobs().catch(() => {});
+
+    channel = supabase
+      .channel(`content-fetch-jobs-${queuedJobIds.join("-")}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "content_fetch_jobs",
+        },
+        () => {
+          refreshJobs().catch(() => {});
+        },
+      )
+      .subscribe();
+
+    const timer = window.setInterval(() => {
+      refreshJobs().catch(() => {});
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [queuedJobIds, step]);
 
   async function loadMaterials() {
     const mats = await getAllMaterials();
     setMaterials(mats);
   }
 
+  async function fetchAndExtract(
+    url: string,
+    provider: ReturnType<typeof getActiveProvider>,
+  ): Promise<{ extraction: ExtractionResult; source: FetchedSource } | null> {
+    const urlType = detectUrlType(url);
+    const fetchMsgs: Record<NonNullable<UrlContentType>, string> = {
+      youtube: "📹 正在提取字幕...",
+      twitter: "🐦 正在抓取全文...",
+      zhihu: "📚 正在抓取知乎...",
+      wechat: "💬 正在抓取公众号...",
+      generic: "🌐 正在抓取网页...",
+    };
+    setExtractingMsg(fetchMsgs[urlType ?? "generic"]);
+
+    const fetchRes = await fetch("/api/fetch-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const fetchData = await fetchRes.json();
+    if (!fetchRes.ok) throw new Error(fetchData.error || "抓取失败");
+
+    const content: string = fetchData.content;
+    if (!content.trim()) throw new Error("抓取内容为空");
+
+    setExtractingMsg(
+      fetchData.isLong
+        ? "📊 长视频已抽样，AI 正在提取词汇..."
+        : "AI 正在提取词汇和句型...",
+    );
+
+    const extractRes = await fetch("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, provider }),
+    });
+    const extractData = await extractRes.json();
+    if (!extractRes.ok) throw new Error(extractData.error || "提取失败");
+    return {
+      extraction: extractData as ExtractionResult,
+      source: {
+        url,
+        title: fetchData.title,
+        contentType: fetchData.contentType ?? (urlType || "generic"),
+        content,
+        markdown: fetchData.markdown,
+        archivePath: fetchData.archivePath,
+        archiveRelativePath: fetchData.archiveRelativePath,
+        fetchMethod: fetchData.fetchMethod,
+        warning: fetchData.warning,
+      },
+    };
+  }
+
   async function handleExtract() {
     const provider = getActiveProvider();
-    if (!provider?.apiKey) {
+    if (mode === "text" && !provider?.apiKey) {
       setError("请先在设置页面配置 AI Provider 的 API Key");
       return;
     }
-
-    let content = "";
     setError("");
-
-    if (mode === "url") {
-      const urlType = detectUrlType(urlInput);
-      if (urlType === "youtube") {
-        setExtractingMsg("📹 正在提取 YouTube 字幕，长视频约需 15-30 秒...");
-      } else if (urlType === "twitter") {
-        setExtractingMsg("🐦 正在抓取推文内容...");
-      } else {
-        setExtractingMsg("🌐 正在抓取网页内容...");
-      }
-    } else {
-      setExtractingMsg("AI 正在分析内容，提取词汇和句型...");
-    }
     setStep("extracting");
 
-    if (mode === "url") {
-      try {
-        const fetchRes = await fetch("/api/fetch-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: urlInput }),
-        });
-        const fetchData = await fetchRes.json();
-        if (!fetchRes.ok) {
-          setError(fetchData.error || "URL 抓取失败");
-          setStep("input");
-          return;
-        }
-        content = fetchData.content;
-        if (fetchData.isLong) {
-          setExtractingMsg("📊 长视频已智能抽样，AI 正在分析关键片段...");
-        } else {
-          setExtractingMsg("AI 正在分析内容，提取词汇和句型...");
-        }
-      } catch {
-        setError("URL 抓取失败");
+    // ── Text mode ──
+    if (mode === "text") {
+      const content = textInput.trim();
+      if (!content) {
+        setError("内容不能为空");
         setStep("input");
         return;
       }
-    } else {
-      content = textInput;
+      setExtractingMsg("AI 正在分析内容，提取词汇和句型...");
+      setFetchedSources([]);
+      try {
+        const res = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, provider }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "提取失败");
+        setExtraction(data);
+        setSelectedWords(
+          new Set(data.words?.map((_: unknown, i: number) => i) ?? []),
+        );
+        setSelectedPatterns(
+          new Set(data.patterns?.map((_: unknown, i: number) => i) ?? []),
+        );
+        setStep("review");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "提取失败");
+        setStep("input");
+      }
+      return;
     }
 
-    if (!content.trim()) {
-      setError("内容不能为空");
+    // ── URL mode ──
+    const urls = parseUrls(urlInput);
+    if (urls.length === 0) {
+      setError("请输入有效的 URL（以 http 开头）");
       setStep("input");
       return;
     }
 
+    if (authLoading) {
+      setError("正在确认登录状态，请稍后重试");
+      setStep("input");
+      return;
+    }
+
+    if (!user) {
+      setError("URL 导入需要先登录 Google，这样 Mac mini 才能把结果写回你的 Supabase");
+      setStep("input");
+      return;
+    }
+
+    setExtractingMsg("正在提交抓取任务到 Mac mini...");
+    setBatchProgress(null);
+    setFetchedSources([]);
+
     try {
-      const res = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, provider }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "提取失败");
-        setStep("input");
-        return;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("content_fetch_jobs")
+        .insert(
+          urls.map((url) => ({
+            user_id: user.id,
+            source_url: url,
+            status: "pending",
+          })),
+        )
+        .select("id, source_url, status, error, result_summary");
+
+      if (error || !data) {
+        throw new Error(error?.message || "任务提交失败");
       }
-      setExtraction(data);
-      // Select all by default
-      setSelectedWords(
-        new Set(data.words?.map((_: unknown, i: number) => i) || []),
-      );
-      setSelectedPatterns(
-        new Set(data.patterns?.map((_: unknown, i: number) => i) || []),
-      );
-      setStep("review");
-    } catch {
-      setError("提取失败，请检查 AI Provider 配置");
+
+      setQueuedJobs(data as QueuedJob[]);
+      setStep("queued");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "任务提交失败");
       setStep("input");
     }
   }
@@ -179,24 +361,50 @@ export default function ImportPage() {
     const patternIds =
       patternsToSave.length > 0 ? await addPatterns(patternsToSave) : [];
 
+    const urls = mode === "url" ? parseUrls(urlInput) : [];
+    const batchTitle =
+      urls.length > 1
+        ? `批量导入 (${urls.length} 条链接)`
+        : urls.length === 1
+          ? fetchedSources[0]?.title || urls[0]
+          : textInput.slice(0, 60) + "...";
     await addMaterial({
-      title: mode === "url" ? urlInput : textInput.slice(0, 60) + "...",
-      content: mode === "url" ? urlInput : textInput,
+      title: batchTitle,
+      content:
+        mode === "url"
+          ? fetchedSources
+              .map((source) =>
+                [`# ${source.title || source.url}`, "", source.content].join(
+                  "\n",
+                ),
+              )
+              .join("\n\n---\n\n")
+          : textInput,
       sourceType: mode,
-      sourceUrl: mode === "url" ? urlInput : undefined,
+      sourceUrl: mode === "url" ? urls[0] : undefined,
+      sourceItems: mode === "url" ? fetchedSources : undefined,
       extractedWordIds: wordIds,
       extractedPatternIds: patternIds,
       keyPhrases: extraction.keyPhrases || [],
-      tags: [],
+      tags:
+        mode === "url"
+          ? Array.from(new Set(fetchedSources.map((source) => source.contentType)))
+          : [],
     });
 
     setStep("saved");
     await loadMaterials();
+
+    // Push to cloud if logged in (fire-and-forget)
+    pushLearningData(createClient()).catch(() => {});
+
     setTimeout(() => {
       setStep("input");
       setTextInput("");
       setUrlInput("");
       setExtraction(null);
+      setFetchedSources([]);
+      setQueuedJobs([]);
     }, 2000);
   }
 
@@ -207,16 +415,16 @@ export default function ImportPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between mb-6 gap-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold">素材导入</h1>
-          <p className="text-sm text-[var(--muted-foreground)]">
+          <p className="text-sm text-[var(--muted-foreground)] hidden sm:block">
             粘贴内容或 URL，AI 自动提取词汇和句型
           </p>
         </div>
         <button
           onClick={() => setShowLibrary(!showLibrary)}
-          className="flex items-center gap-1 rounded-lg bg-[var(--secondary)] px-3 py-2 text-sm hover:bg-[var(--muted)] transition-colors"
+          className="flex items-center gap-1 rounded-lg bg-[var(--secondary)] px-3 py-2 text-sm hover:bg-[var(--muted)] transition-colors shrink-0"
         >
           素材库 ({materials.length})
           {showLibrary ? (
@@ -292,12 +500,14 @@ export default function ImportPage() {
               className="w-full h-64 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm outline-none focus:border-[var(--primary)] resize-none transition-colors"
             />
           ) : (
-            <input
-              type="url"
+            <textarea
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://x.com/... 或 https://blog.example.com/..."
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm outline-none focus:border-[var(--primary)] transition-colors"
+              placeholder={
+                "https://x.com/...\nhttps://zhihu.com/...\nhttps://mp.weixin.qq.com/..."
+              }
+              rows={8}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm outline-none focus:border-[var(--primary)] resize-none transition-colors leading-relaxed overflow-x-hidden [word-break:break-all]"
             />
           )}
 
@@ -305,21 +515,72 @@ export default function ImportPage() {
           {mode === "url" &&
             urlInput &&
             (() => {
-              const urlType = detectUrlType(urlInput);
-              if (urlType === "youtube")
-                return (
-                  <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                    📹 将提取 YouTube 视频字幕（支持长视频，超过 8000
-                    词自动抽样）
+              const urls = parseUrls(urlInput);
+              if (urls.length === 0) return null;
+              if (urls.length === 1) {
+                const t = detectUrlType(urls[0]);
+                if (t === "youtube")
+                  return (
+                    <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                      📹 将提取 YouTube 视频字幕（支持长视频，超过 8000
+                      词自动抽样）
+                    </div>
+                  );
+                if (t === "twitter")
+                  return (
+                    <div className="rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-400">
+                      🐦 将全量抓取推文 / X Article 全文（Playwright 渲染，约需
+                      30-60 秒）
+                    </div>
+                  );
+                if (t === "zhihu")
+                  return (
+                    <div className="rounded-lg bg-blue-500/10 px-3 py-2 text-xs text-blue-400">
+                      📚 将全量抓取知乎文章 / 回答（Playwright 渲染，约需 30-60
+                      秒）
+                    </div>
+                  );
+                if (t === "wechat")
+                  return (
+                    <div className="rounded-lg bg-green-500/10 px-3 py-2 text-xs text-green-400">
+                      💬 将全量抓取微信公众号文章（Playwright 渲染，约需 30-60
+                      秒）
+                    </div>
+                  );
+                return null;
+              }
+              return (
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-xs space-y-1.5">
+                  <div className="text-[var(--muted-foreground)]">
+                    已识别{" "}
+                    <span className="font-medium text-[var(--foreground)]">
+                      {urls.length}
+                    </span>{" "}
+                    个链接，将按顺序依次抓取
+                    {urls.length >= MAX_BATCH_URLS && (
+                      <span className="text-amber-400 ml-1">
+                        （已达上限 {MAX_BATCH_URLS} 条）
+                      </span>
+                    )}
                   </div>
-                );
-              if (urlType === "twitter")
-                return (
-                  <div className="flex items-center gap-2 rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-400">
-                    🐦 将提取推文全文（仅支持公开推文）
+                  <div className="space-y-1">
+                    {urls.map((u, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-1.5 text-[var(--muted-foreground)]"
+                      >
+                        <span className="w-4 text-right shrink-0 tabular-nums">
+                          {i + 1}.
+                        </span>
+                        <span className="shrink-0">
+                          {urlTypeLabel(detectUrlType(u))}
+                        </span>
+                        <span className="truncate opacity-70">{u}</span>
+                      </div>
+                    ))}
                   </div>
-                );
-              return null;
+                </div>
+              );
             })()}
 
           {error && (
@@ -334,24 +595,150 @@ export default function ImportPage() {
             disabled={mode === "text" ? !textInput.trim() : !urlInput.trim()}
             className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            <Sparkles className="h-4 w-4" /> AI 提取词汇和句型
+            <Sparkles className="h-4 w-4" />
+            {mode === "url" ? "提交抓取任务" : "AI 提取词汇和句型"}
           </button>
         </div>
       )}
 
       {/* Extracting Step */}
       {step === "extracting" && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="flex flex-col items-center justify-center py-16 gap-5">
           <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
-          <p className="text-sm text-[var(--muted-foreground)]">
-            {extractingMsg}
-          </p>
+
+          {batchProgress ? (
+            <div className="w-full max-w-sm space-y-3">
+              {/* N/M counter */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--muted-foreground)]">
+                  {extractingMsg}
+                </span>
+                <span className="tabular-nums font-medium text-[var(--foreground)]">
+                  {batchProgress.current}/{batchProgress.total}
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="h-1.5 w-full rounded-full bg-[var(--secondary)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[var(--primary)] transition-all duration-500"
+                  style={{
+                    width: `${(batchProgress.current / batchProgress.total) * 100}%`,
+                  }}
+                />
+              </div>
+              {/* Current URL */}
+              <p className="text-xs text-[var(--muted-foreground)] truncate text-center">
+                {batchProgress.url}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--muted-foreground)]">
+              {extractingMsg}
+            </p>
+          )}
+        </div>
+      )}
+
+      {step === "queued" && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
+            <h3 className="font-semibold">已提交到 Mac mini 抓取队列</h3>
+            <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+              Mac mini 会调用 Content Fetcher 抓全文，整理 Markdown，提取词汇和句型，然后直接写入 Supabase。
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {queuedJobs.map((job) => (
+              <div
+                key={job.id}
+                className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {job.result_summary?.title || job.source_url}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted-foreground)] truncate">
+                      {job.source_url}
+                    </p>
+                    {job.status === "failed" && job.error && (
+                      <p className="mt-2 text-xs text-red-400">{job.error}</p>
+                    )}
+                    {job.status === "completed" && (
+                      <p className="mt-2 text-xs text-emerald-400">
+                        已入库：{job.result_summary?.wordsCount ?? 0} 词 ·{" "}
+                        {job.result_summary?.patternsCount ?? 0} 句型
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-1 text-xs",
+                      job.status === "completed" &&
+                        "bg-emerald-500/10 text-emerald-400",
+                      job.status === "failed" && "bg-red-500/10 text-red-400",
+                      job.status === "processing" &&
+                        "bg-sky-500/10 text-sky-400",
+                      job.status === "pending" &&
+                        "bg-amber-500/10 text-amber-400",
+                    )}
+                  >
+                    {job.status === "completed"
+                      ? "已完成"
+                      : job.status === "failed"
+                        ? "失败"
+                        : job.status === "processing"
+                          ? "处理中"
+                          : "排队中"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                await loadMaterials();
+                setStep("input");
+                setUrlInput("");
+                setQueuedJobs([]);
+              }}
+              className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              返回继续导入
+            </button>
+            <button
+              onClick={async () => {
+                const supabase = createClient();
+                await pullLearningData(supabase);
+                await loadMaterials();
+              }}
+              className="rounded-lg bg-[var(--secondary)] px-4 py-2.5 text-sm hover:bg-[var(--muted)]"
+            >
+              手动刷新素材库
+            </button>
+          </div>
         </div>
       )}
 
       {/* Review Step */}
       {step === "review" && extraction && (
         <div className="space-y-6">
+          {mode === "url" && fetchedSources.length > 0 && (
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm">
+              <p className="font-medium">
+                已抓取 {fetchedSources.length} 条素材，并整理为 Markdown
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                {fetchedSources.some((source) => source.archiveRelativePath)
+                  ? `归档目录：抓内容素材 / ${fetchedSources.find((source) => source.archiveRelativePath)?.archiveRelativePath?.split("/").pop()}`
+                  : "当前环境未返回本地归档路径"}
+              </p>
+            </div>
+          )}
+
           {/* Extracted Words */}
           {extraction.words?.length > 0 && (
             <div>
@@ -528,6 +915,7 @@ export default function ImportPage() {
               onClick={() => {
                 setStep("input");
                 setExtraction(null);
+                setFetchedSources([]);
               }}
               className="flex items-center gap-2 rounded-lg bg-[var(--secondary)] px-4 py-2.5 text-sm hover:bg-[var(--muted)]"
             >

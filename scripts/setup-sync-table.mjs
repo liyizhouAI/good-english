@@ -20,6 +20,29 @@ if (!SERVICE_ROLE_KEY) {
 }
 
 const SQL = `
+create table if not exists user_settings (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  settings_data text not null,
+  updated_at timestamptz not null default now(),
+  unique(user_id)
+);
+
+alter table user_settings enable row level security;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where tablename = 'user_settings'
+    and policyname = 'Users manage own settings'
+  ) then
+    create policy "Users manage own settings"
+      on user_settings for all
+      using (auth.uid() = user_id)
+      with check (auth.uid() = user_id);
+  end if;
+end $$;
+
 create table if not exists user_learning_data (
   user_id uuid references auth.users primary key,
   words_data    text not null default '[]',

@@ -4,6 +4,29 @@ import { createClient } from '@supabase/supabase-js';
 // Checks if the cloud tables exist.
 // If not, returns the SQL to create them manually.
 const sql = `
+create table if not exists user_settings (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  settings_data text not null,
+  updated_at timestamptz not null default now(),
+  unique(user_id)
+);
+
+alter table user_settings enable row level security;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where tablename = 'user_settings'
+    and policyname = 'Users manage own settings'
+  ) then
+    create policy "Users manage own settings"
+      on user_settings for all
+      using (auth.uid() = user_id)
+      with check (auth.uid() = user_id);
+  end if;
+end $$;
+
 create table if not exists user_learning_data (
   user_id       uuid references auth.users primary key,
   words_data    text not null default '[]',
@@ -78,12 +101,13 @@ export async function GET() {
     { auth: { persistSession: false } },
   );
 
-  const [learningCheck, jobsCheck] = await Promise.all([
+  const [settingsCheck, learningCheck, jobsCheck] = await Promise.all([
+    supabase.from('user_settings').select('id').limit(1),
     supabase.from('user_learning_data').select('user_id').limit(1),
     supabase.from('content_fetch_jobs').select('id').limit(1),
   ]);
 
-  if (!learningCheck.error && !jobsCheck.error) {
+  if (!settingsCheck.error && !learningCheck.error && !jobsCheck.error) {
     return NextResponse.json({ status: 'ok', message: 'Tables already exist' });
   }
 

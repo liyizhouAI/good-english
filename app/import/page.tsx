@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -57,6 +57,8 @@ type QueuedJob = {
   source_url: string;
   status: FetchJobStatus;
   error?: string | null;
+  requested_at?: string;
+  completed_at?: string | null;
   result_summary?: {
     title?: string;
     wordsCount?: number;
@@ -129,18 +131,18 @@ export default function ImportPage() {
   const [queuedJobs, setQueuedJobs] = useState<QueuedJob[]>([]);
   const [authError, setAuthError] = useState("");
   const urlSubmitDisabled = !urlInput.trim();
-
-  const queuedJobIds = useMemo(
-    () => queuedJobs.map((job) => job.id),
-    [queuedJobs],
-  );
+  const lastJobSignatureRef = useRef("");
 
   useEffect(() => {
     loadMaterials();
   }, []);
 
   useEffect(() => {
-    if (step !== "queued" || queuedJobIds.length === 0) return;
+    if (!user) {
+      setQueuedJobs([]);
+      return;
+    }
+    const currentUser = user;
 
     const supabase = createClient();
     let cancelled = false;
@@ -149,20 +151,29 @@ export default function ImportPage() {
     async function refreshJobs() {
       const { data, error } = await supabase
         .from("content_fetch_jobs")
-        .select("id, source_url, status, error, result_summary")
-        .in("id", queuedJobIds)
-        .order("requested_at", { ascending: true });
+        .select(
+          "id, source_url, status, error, result_summary, requested_at, completed_at",
+        )
+        .eq("user_id", currentUser.id)
+        .order("requested_at", { ascending: false })
+        .limit(20);
 
       if (cancelled || error || !data) return;
 
       const jobs = data as QueuedJob[];
       setQueuedJobs(jobs);
 
-      const allDone = jobs.every(
-        (job) => job.status === "completed" || job.status === "failed",
-      );
+      const signature = jobs.map((job) => `${job.id}:${job.status}`).join("|");
+      const hasStatusChange =
+        signature.length > 0 && signature !== lastJobSignatureRef.current;
+      lastJobSignatureRef.current = signature;
 
-      if (allDone) {
+      if (
+        hasStatusChange &&
+        jobs.some(
+          (job) => job.status === "completed" || job.status === "failed",
+        )
+      ) {
         await pullLearningData(supabase);
         await loadMaterials();
       }
@@ -171,13 +182,14 @@ export default function ImportPage() {
     refreshJobs().catch(() => {});
 
     channel = supabase
-      .channel(`content-fetch-jobs-${queuedJobIds.join("-")}`)
+      .channel(`content-fetch-jobs-${user.id}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "content_fetch_jobs",
+          filter: `user_id=eq.${currentUser.id}`,
         },
         () => {
           refreshJobs().catch(() => {});
@@ -194,7 +206,7 @@ export default function ImportPage() {
       window.clearInterval(timer);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [queuedJobIds, step]);
+  }, [user]);
 
   async function loadMaterials() {
     const mats = await getAllMaterials();
@@ -426,6 +438,72 @@ export default function ImportPage() {
     await loadMaterials();
   }
 
+  function renderQueuedJobsPanel(showHeader = true) {
+    if (queuedJobs.length === 0) return null;
+
+    return (
+      <div className="space-y-4">
+        {showHeader && (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
+            <h3 className="font-semibold">最近抓取任务</h3>
+            <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+              排队中和处理中的任务会持续显示；完成后会自动写入素材、词汇和句型。
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {queuedJobs.map((job) => (
+            <div
+              key={job.id}
+              className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {job.result_summary?.title || job.source_url}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)] truncate">
+                    {job.source_url}
+                  </p>
+                  {job.status === "failed" && job.error && (
+                    <p className="mt-2 text-xs text-red-400">{job.error}</p>
+                  )}
+                  {job.status === "completed" && (
+                    <p className="mt-2 text-xs text-emerald-400">
+                      已入库：{job.result_summary?.wordsCount ?? 0} 词 ·{" "}
+                      {job.result_summary?.patternsCount ?? 0} 句型
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2 py-1 text-xs",
+                    job.status === "completed" &&
+                      "bg-emerald-500/10 text-emerald-400",
+                    job.status === "failed" && "bg-red-500/10 text-red-400",
+                    job.status === "processing" &&
+                      "bg-sky-500/10 text-sky-400",
+                    job.status === "pending" &&
+                      "bg-amber-500/10 text-amber-400",
+                  )}
+                >
+                  {job.status === "completed"
+                    ? "已完成"
+                    : job.status === "failed"
+                      ? "失败"
+                      : job.status === "processing"
+                        ? "处理中"
+                        : "排队中"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6 gap-2">
@@ -640,6 +718,8 @@ export default function ImportPage() {
             <Sparkles className="h-4 w-4" />
             {mode === "url" ? "提交抓取任务" : "AI 提取词汇和句型"}
           </button>
+
+          {mode === "url" && renderQueuedJobsPanel(false)}
         </div>
       )}
 
@@ -690,54 +770,7 @@ export default function ImportPage() {
             </p>
           </div>
 
-          <div className="space-y-2">
-            {queuedJobs.map((job) => (
-              <div
-                key={job.id}
-                className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {job.result_summary?.title || job.source_url}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--muted-foreground)] truncate">
-                      {job.source_url}
-                    </p>
-                    {job.status === "failed" && job.error && (
-                      <p className="mt-2 text-xs text-red-400">{job.error}</p>
-                    )}
-                    {job.status === "completed" && (
-                      <p className="mt-2 text-xs text-emerald-400">
-                        已入库：{job.result_summary?.wordsCount ?? 0} 词 ·{" "}
-                        {job.result_summary?.patternsCount ?? 0} 句型
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full px-2 py-1 text-xs",
-                      job.status === "completed" &&
-                        "bg-emerald-500/10 text-emerald-400",
-                      job.status === "failed" && "bg-red-500/10 text-red-400",
-                      job.status === "processing" &&
-                        "bg-sky-500/10 text-sky-400",
-                      job.status === "pending" &&
-                        "bg-amber-500/10 text-amber-400",
-                    )}
-                  >
-                    {job.status === "completed"
-                      ? "已完成"
-                      : job.status === "failed"
-                        ? "失败"
-                        : job.status === "processing"
-                          ? "处理中"
-                          : "排队中"}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderQueuedJobsPanel(false)}
 
           <div className="flex gap-3">
             <button
@@ -745,7 +778,6 @@ export default function ImportPage() {
                 await loadMaterials();
                 setStep("input");
                 setUrlInput("");
-                setQueuedJobs([]);
               }}
               className="rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
             >

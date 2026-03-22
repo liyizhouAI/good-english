@@ -195,7 +195,6 @@ export default function ChatPage() {
         const { done, value } = await reader.read();
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
-        setMessages([...newMessages, { role: "assistant", content: fullText }]);
       }
 
       let parsedMsg: ChatMsg = { role: "assistant", content: fullText };

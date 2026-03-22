@@ -19,7 +19,8 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Good English - 好英语",
-  description: "好英语，通过刻意练习，让你像播客嘉宾一样侃侃而谈，流利、深刻而温暖人心。",
+  description:
+    "好英语，通过刻意练习，让你像播客嘉宾一样侃侃而谈，流利、深刻而温暖人心。",
 };
 
 export default function RootLayout({
@@ -32,7 +33,7 @@ export default function RootLayout({
       <body className="antialiased">
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-16 md:pt-6">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-12 md:pt-6">
             {children}
           </main>
         </div>

@@ -136,7 +136,7 @@ export default function SettingsPage() {
                           })
                         }
                         placeholder="sk-... (填入后自动保存到本地)"
-                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)] transition-colors"
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-base outline-none focus:border-[var(--primary)] transition-colors"
                       />
                       <button
                         onClick={() =>

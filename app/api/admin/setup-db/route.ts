@@ -3,35 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Checks if the cloud tables exist.
 // If not, returns the SQL to create them manually.
-export async function GET() {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) {
-    return NextResponse.json(
-      {
-        status: 'no_service_key',
-        message: 'Add SUPABASE_SERVICE_ROLE_KEY to .env.local to check table status',
-      },
-      { status: 200 },
-    );
-  }
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceKey,
-    { auth: { persistSession: false } },
-  );
-
-  const [learningCheck, jobsCheck] = await Promise.all([
-    supabase.from('user_learning_data').select('user_id').limit(1),
-    supabase.from('content_fetch_jobs').select('id').limit(1),
-  ]);
-
-  if (!learningCheck.error && !jobsCheck.error) {
-    return NextResponse.json({ status: 'ok', message: 'Tables already exist' });
-  }
-
-  // One or more tables don't exist — return SQL to create them
-  const sql = `
+const sql = `
 create table if not exists user_learning_data (
   user_id       uuid references auth.users primary key,
   words_data    text not null default '[]',
@@ -69,6 +41,35 @@ create policy "Users manage own fetch jobs"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 `.trim();
+
+export async function GET() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    return NextResponse.json(
+      {
+        status: 'no_service_key',
+        message: 'Server 侧没有配置 SUPABASE_SERVICE_ROLE_KEY，无法自动检查；但你可以直接复制下面 SQL 到 Supabase 执行。',
+        sql,
+        dashboard_url: 'https://supabase.com/dashboard/project/twjsspsplskqsgmnegrk/sql/new',
+      },
+      { status: 200 },
+    );
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceKey,
+    { auth: { persistSession: false } },
+  );
+
+  const [learningCheck, jobsCheck] = await Promise.all([
+    supabase.from('user_learning_data').select('user_id').limit(1),
+    supabase.from('content_fetch_jobs').select('id').limit(1),
+  ]);
+
+  if (!learningCheck.error && !jobsCheck.error) {
+    return NextResponse.json({ status: 'ok', message: 'Tables already exist' });
+  }
 
   return NextResponse.json({
     status: 'table_missing',

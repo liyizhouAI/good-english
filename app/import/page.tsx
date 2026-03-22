@@ -89,6 +89,19 @@ function detectUrlType(url: string): UrlContentType {
   return null;
 }
 
+function formatImportError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (
+    message.includes("Could not find the table 'public.content_fetch_jobs'") ||
+    message.includes("content_fetch_jobs")
+  ) {
+    return "Supabase 还没有初始化 URL 抓取队列表 `content_fetch_jobs`。先运行 `node scripts/setup-sync-table.mjs`，或到 `/api/admin/setup-db` 复制 SQL 去 Supabase 执行。";
+  }
+
+  return message;
+}
+
 export default function ImportPage() {
   const { getActiveProvider } = useSettings();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
@@ -277,10 +290,10 @@ export default function ImportPage() {
           new Set(data.patterns?.map((_: unknown, i: number) => i) ?? []),
         );
         setStep("review");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "提取失败");
-        setStep("input");
-      }
+    } catch (e) {
+      setError(formatImportError(e) || "提取失败");
+      setStep("input");
+    }
       return;
     }
 
@@ -326,7 +339,7 @@ export default function ImportPage() {
       setQueuedJobs(data as QueuedJob[]);
       setStep("queued");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "任务提交失败");
+      setError(formatImportError(e) || "任务提交失败");
       setStep("input");
     }
   }

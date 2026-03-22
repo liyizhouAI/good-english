@@ -39,6 +39,7 @@
 ### 1. 素材导入 & 智能提取（`/import`）
 - 粘贴文本直接 AI 提取；URL 写入 Supabase 抓取队列，由常驻 Mac mini 调用 Content Fetcher skill 处理
 - AI 自动提取：高级词汇 / 可复用句型 / 关键短语
+- 中文内容也会提炼核心概念、金句、观点、事件，并转成自然英语学习材料入库
 - 抓取完成后自动归档 Markdown 到项目内 `DB/`
 - Markdown、词汇、句型统一写回 Supabase，所有设备读取同一份云端数据
 
@@ -96,7 +97,7 @@ Settings 页面（`/settings`）配置，支持多个 Provider 自由切换。
   - `user_settings`：API Key 云端同步
   - `user_learning_data`：词汇 / 句型 / 素材云端主存储（云端为准，多设备实时同步）
   - `content_fetch_jobs`：URL 抓取任务队列（手机提交 URL，Mac mini 消费任务）
-- Auth Provider：Google OAuth（需在 Google Cloud Console 配置）
+- Auth Provider：Google OAuth（已打通，用于 URL 导入和 API Key 跨设备同步）
 
 #### Supabase SQL（已执行）
 
@@ -155,10 +156,11 @@ create policy "Users manage own fetch jobs"
   with check (auth.uid() = user_id);
 ```
 
-### Google OAuth（待完成配置）
+### Google OAuth
 1. Google Cloud Console → 新建项目 → OAuth Consent Screen → Credentials
 2. Authorized redirect URI：`https://twjsspsplskqsgmnegrk.supabase.co/auth/v1/callback`
 3. 将 Client ID + Secret 填入 Supabase → Authentication → Providers → Google
+4. 登录后 `/import` 会直接把 URL 抓取任务绑定到当前 `user_id`
 
 ### 环境变量
 `.env.local`（本地开发用）：
@@ -183,6 +185,14 @@ Vercel 生产环境已配置同名变量。
 
 这样手机、Mac、其他设备都只认 Supabase，不依赖某一台设备的本地 IndexedDB。
 
+### 导入页体验
+
+- 默认入口改为 `粘贴 URL`
+- 最近任务列表固定显示在导入页下方
+- 刷新页面时会先回显最近任务缓存，再立刻向 Supabase 补拉真实状态
+- Realtime + 短间隔补拉 + 页面重新聚焦刷新，尽量把状态恢复压到 3 秒内
+- 列表最多显示 5 条可视高度，超过后滚动显示
+
 ### Mac mini Worker
 
 初始化云端表：
@@ -200,7 +210,30 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY npm run worker
 SUPABASE_SERVICE_ROLE_KEY=YOUR_KEY npm run worker:once
 ```
 
-worker 默认使用 Supabase Realtime 监听新任务，并用 15 秒轻量轮询做兜底，不依赖每分钟 cron。归档文件名统一为 `YYYY-MM-DD_HHmm_来源_内容slug_短哈希.md`。
+worker 默认使用 Supabase Realtime 监听新任务，并用 60 秒轻量轮询做兜底，不依赖每分钟 cron。空闲时只保持一个轻量 Node 进程和一条长连接，资源占用很低。归档文件名统一为 `YYYY-MM-DD_HHmm_来源_内容slug_短哈希.md`。
+
+---
+
+## 2026-03-23 开发进展
+
+今天这轮把 URL 导入链路和云端同步真正拉通了，当前已经是可用状态：
+
+- 手机浏览器提交 URL -> Supabase `content_fetch_jobs` -> Mac mini worker -> Content Fetcher -> Markdown 归档到 `DB/` -> 提取词汇句型 -> 回写 Supabase，全链路可用
+- `user_settings`、`user_learning_data`、`content_fetch_jobs` 三张关键表已补齐
+- Google 登录、登录回跳、URL 任务归属 `user_id` 已打通
+- 导入页刷新后任务列表不会再长时间空白，排队中 / 处理中 / 已完成状态会持续显示
+- 中文公众号文章不再只入素材不出学习项，而是会自动转成可学习的英文词汇和句型
+- worker 增加了提取重试和超时兜底，降低偶发网络波动导致的失败
+- 内容归档统一收口到现有 `DB/` 目录，没有新建重复文件夹
+
+本轮已经实际跑通 4 条真实来源：
+
+- X / Twitter
+- YouTube
+- 知乎回答
+- 微信公众号文章
+
+当前系统已经验证过：抓取完成后会同步把素材、词汇、句型写回 Supabase，多端看到的是同一份数据。
 
 ---
 
@@ -261,6 +294,7 @@ components/
 - [ ] 千问 Paraformer 语音识别（验证 compatible-mode 是否支持直传）
 - [ ] 仪表盘学习曲线图、连续打卡
 - [ ] PWA 支持
+- [ ] Mac mini worker 开机自启和更完整的运行监控
 
 ---
 

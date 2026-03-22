@@ -23,6 +23,7 @@ const MAX_WORDS = 8000;
 const REMOTE_READER_PREFIX = "https://r.jina.ai/http://";
 const DEFAULT_FETCHER_SCRIPT =
   "/Users/liyizhouai/Desktop/openclaw/skill/内容抓取/scripts/fetch.py";
+const DEFAULT_FETCHER_PYTHON = "/opt/homebrew/bin/python3";
 
 export type UrlType = "youtube" | "twitter" | "zhihu" | "wechat" | "generic";
 
@@ -142,6 +143,22 @@ function resolveFetcherScriptPath(): string | null {
   return null;
 }
 
+function resolveFetcherPython(): string {
+  const candidates = [
+    process.env.CONTENT_FETCHER_PYTHON,
+    DEFAULT_FETCHER_PYTHON,
+    "python3",
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    if (candidate === "python3" || existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return "python3";
+}
+
 function resolveArchiveRoot(): { root: string; warning?: string } {
   const defaultRoot = path.join(process.cwd(), "DB");
   const candidates = [
@@ -258,7 +275,7 @@ async function fetchViaContentFetcher(url: string, type: UrlType): Promise<Fetch
     const args = [scriptPath, url, "-o", tempDir];
     if (type === "zhihu") args.push("--show-browser");
 
-    const { stdout, stderr } = await execFileAsync("python3", args, {
+    const { stdout, stderr } = await execFileAsync(resolveFetcherPython(), args, {
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
     });

@@ -29,6 +29,11 @@ const APP_URL =
 const CONTENT_FETCHER_SCRIPT =
   process.env.CONTENT_FETCHER_SCRIPT ||
   "/Users/liyizhouai/Desktop/openclaw/skill/内容抓取/scripts/fetch.py";
+const CONTENT_FETCHER_PYTHON =
+  process.env.CONTENT_FETCHER_PYTHON ||
+  (existsSync("/opt/homebrew/bin/python3")
+    ? "/opt/homebrew/bin/python3"
+    : "python3");
 const ARCHIVE_DIR =
   process.env.GOOD_ENGLISH_ARCHIVE_DIR ||
   path.join(process.cwd(), "DB");
@@ -210,7 +215,7 @@ async function fetchContent(url) {
     const args = [CONTENT_FETCHER_SCRIPT, url, "-o", tempDir];
     if (type === "zhihu") args.push("--show-browser");
 
-    const { stdout, stderr } = await execFileAsync("python3", args, {
+    const { stdout, stderr } = await execFileAsync(CONTENT_FETCHER_PYTHON, args, {
       timeout: 180_000,
       maxBuffer: 10 * 1024 * 1024,
     });

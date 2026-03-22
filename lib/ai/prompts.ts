@@ -130,26 +130,28 @@ The input may be in English, Chinese, or mixed. Handle all cases:
 
 **For English or mixed content**: extract vocabulary, sentence patterns, and key phrases as described below.
 
-**For primarily Chinese content**: vocabulary and patterns arrays may be empty or minimal; focus on extracting key Chinese concepts, topics, and domain terms into keyPhrases so the material can be referenced in future conversations.
+**For primarily Chinese content**: do NOT leave the vocabulary and patterns arrays empty if the material contains transferable ideas. Identify the most valuable concepts, claims, quotes, trends, events, frameworks, and talking points, then convert them into natural, up-to-date, idiomatic English that the learner can actually use in conversations. Treat the Chinese article as raw source material for building an English learning set.
 
 Given text content, extract:
 
-1. **Vocabulary**: Professional/advanced English words and phrases (B2+ level). Skip common words. For each:
+1. **Vocabulary**: Professional/advanced English words and phrases (B2+ level). Skip common words. For Chinese source material, translate the core concept into the most natural English word or phrase instead of literal word-by-word translation. Prefer expressions a well-read native speaker would actually use today. For each:
    - english: the word or phrase
    - chinese: Chinese meaning
    - partOfSpeech: noun/verb/adj/adv/phrase
-   - exampleSentence: a sentence from or inspired by the source text
+   - exampleSentence: a natural English sentence from or inspired by the source text
    - exampleTranslation: Chinese translation of the example
    - context: brief note about usage context
    - category: "daily" | "business" | "ai-tech"
 
-2. **Sentence Patterns**: Reusable templates for professional English. For each:
-   - pattern: generalized template (e.g., "The key insight is that...")
-   - patternChinese: Chinese explanation of when to use it
+2. **Sentence Patterns**: Reusable templates for professional English. For Chinese source material, convert the article's core viewpoints, arguments, hot takes, or explanatory frames into reusable English sentence patterns. These should sound current and conversation-ready, not textbook-like. For each:
+   - pattern: generalized English template (e.g., "The key insight is that...")
+   - patternChinese: Chinese explanation of what idea this pattern expresses and when to use it
    - scenario: "self-intro" | "ai-discussion" | "business" | "social" | "interview"
    - examples: 2-3 example usages with Chinese translations
 
-3. **Key Phrases**: For English content — notable collocations, idioms, or expressions worth learning. For Chinese content — key topics, concepts, and domain terms from the material (in Chinese or pinyin as appropriate).
+3. **Key Phrases**:
+   - For English content: notable collocations, idioms, or expressions worth learning.
+   - For Chinese content: concise English renderings of the article's key topics, concepts, slogans, quoted ideas, trend labels, and event references. Use Chinese only when needed for disambiguation.
 
 Return VALID JSON only (no markdown, no explanation):
 {
@@ -162,4 +164,10 @@ Focus on vocabulary and patterns that would be useful for:
 - Discussing AI technology and trends
 - Business and startup conversations
 - Professional networking
-- Expressing opinions confidently`;
+- Expressing opinions confidently
+
+Additional rules:
+- For primarily Chinese content, usually return at least 8 useful words/phrases and 4 reusable sentence patterns unless the source is extremely thin.
+- Prefer concept-level translation over literal translation.
+- If the source includes timely ideas, product names, public debates, or cultural references, turn them into polished English discussion material.
+- Make the English output sound like something the learner could actually say in a podcast, interview, founder conversation, or tech networking setting.`;

@@ -34,6 +34,8 @@ const ARCHIVE_DIR =
   path.join(process.cwd(), "DB");
 const JOB_LIMIT = Number(process.env.GOOD_ENGLISH_JOB_LIMIT || 3);
 const POLL_INTERVAL_MS = Number(process.env.GOOD_ENGLISH_POLL_INTERVAL_MS || 60000);
+const EXTRACT_TIMEOUT_MS = Number(process.env.GOOD_ENGLISH_EXTRACT_TIMEOUT_MS || 120000);
+const EXTRACT_RETRY_COUNT = Number(process.env.GOOD_ENGLISH_EXTRACT_RETRY_COUNT || 3);
 const WATCH_MODE = process.argv.includes("--watch");
 
 if (!SERVICE_ROLE_KEY) {
@@ -249,17 +251,42 @@ async function fetchContent(url) {
 }
 
 async function extractContent(content, provider) {
-  const response = await fetch(`${APP_URL.replace(/\/$/, "")}/api/extract`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, provider }),
-  });
+  let lastError = null;
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || "提取失败");
+  for (let attempt = 1; attempt <= EXTRACT_RETRY_COUNT; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), EXTRACT_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${APP_URL.replace(/\/$/, "")}/api/extract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, provider }),
+        signal: controller.signal,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "提取失败");
+      }
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < EXTRACT_RETRY_COUNT) {
+        const waitMs = attempt * 2000;
+        console.warn(
+          `⚠️ Extract attempt ${attempt}/${EXTRACT_RETRY_COUNT} failed: ${
+            error instanceof Error ? error.message : String(error)
+          }. Retrying in ${waitMs}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   }
-  return data;
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError || "提取失败"));
 }
 
 async function getActiveProvider(userId) {

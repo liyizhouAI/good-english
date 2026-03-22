@@ -44,6 +44,8 @@ type UrlContentType =
 const MAX_BATCH_URLS = 10;
 const JOB_PANEL_VISIBLE_COUNT = 5;
 const JOB_REFRESH_INTERVAL_MS = 2500;
+const JOB_FAST_REFRESH_STEPS_MS = [0, 800, 1800];
+const JOB_CACHE_KEY = "good-english-import-jobs";
 
 type FetchedSource = MaterialSourceItem & {
   warning?: string;
@@ -64,6 +66,40 @@ type QueuedJob = {
     patternsCount?: number;
   } | null;
 };
+
+function loadCachedJobs(): QueuedJob[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(JOB_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed as QueuedJob[];
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedJobs(jobs: QueuedJob[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(JOB_CACHE_KEY, JSON.stringify(jobs));
+  } catch {
+    // Ignore cache failures and keep live sync working.
+  }
+}
+
+function clearCachedJobs() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(JOB_CACHE_KEY);
+  } catch {
+    // Ignore cache cleanup failures.
+  }
+}
 
 function parseUrls(input: string): string[] {
   return input
@@ -135,23 +171,35 @@ export default function ImportPage() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setQueuedJobs([]);
-      return;
+    const cachedJobs = loadCachedJobs();
+    if (cachedJobs.length > 0) {
+      setQueuedJobs(cachedJobs);
     }
-    const currentUser = user;
+  }, []);
 
+  useEffect(() => {
+    if (queuedJobs.length > 0) {
+      saveCachedJobs(queuedJobs);
+    } else if (!authLoading && !user) {
+      clearCachedJobs();
+    }
+  }, [authLoading, queuedJobs, user]);
+
+  useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
     let channel: RealtimeChannel | null = null;
+    let focusHandler: (() => void) | null = null;
+    let visibilityHandler: (() => void) | null = null;
+    const fastRefreshTimers: number[] = [];
 
-    async function refreshJobs() {
+    async function refreshJobs(userId: string) {
       const { data, error } = await supabase
         .from("content_fetch_jobs")
         .select(
           "id, source_url, status, error, result_summary, requested_at, completed_at",
         )
-        .eq("user_id", currentUser.id)
+        .eq("user_id", userId)
         .order("requested_at", { ascending: false })
         .limit(20);
 
@@ -159,6 +207,7 @@ export default function ImportPage() {
 
       const jobs = data as QueuedJob[];
       setQueuedJobs(jobs);
+      saveCachedJobs(jobs);
 
       const signature = jobs.map((job) => `${job.id}:${job.status}`).join("|");
       const hasStatusChange =
@@ -176,34 +225,91 @@ export default function ImportPage() {
       }
     }
 
-    refreshJobs().catch(() => {});
+    async function resolveCurrentUserId() {
+      if (user?.id) return user.id;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      return session?.user?.id ?? null;
+    }
 
-    channel = supabase
-      .channel(`content-fetch-jobs-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "content_fetch_jobs",
-          filter: `user_id=eq.${currentUser.id}`,
-        },
-        () => {
-          refreshJobs().catch(() => {});
-        },
-      )
-      .subscribe();
+    async function initializeJobsSync() {
+      const currentUserId = await resolveCurrentUserId();
+      if (cancelled) return;
+
+      if (!currentUserId) {
+        if (!authLoading) {
+          setQueuedJobs([]);
+          clearCachedJobs();
+        }
+        return;
+      }
+
+      await refreshJobs(currentUserId);
+
+      for (const delay of JOB_FAST_REFRESH_STEPS_MS) {
+        const timer = window.setTimeout(() => {
+          refreshJobs(currentUserId).catch(() => {});
+        }, delay);
+        fastRefreshTimers.push(timer);
+      }
+
+      channel = supabase
+        .channel(`content-fetch-jobs-${currentUserId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "content_fetch_jobs",
+            filter: `user_id=eq.${currentUserId}`,
+          },
+          () => {
+            refreshJobs(currentUserId).catch(() => {});
+          },
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            refreshJobs(currentUserId).catch(() => {});
+          }
+        });
+
+      focusHandler = () => {
+        refreshJobs(currentUserId).catch(() => {});
+      };
+
+      visibilityHandler = () => {
+        if (document.visibilityState === "visible") {
+          refreshJobs(currentUserId).catch(() => {});
+        }
+      };
+
+      window.addEventListener("focus", focusHandler);
+      document.addEventListener("visibilitychange", visibilityHandler);
+    }
+
+    initializeJobsSync().catch(() => {});
 
     const timer = window.setInterval(() => {
-      refreshJobs().catch(() => {});
+      resolveCurrentUserId()
+        .then((currentUserId) => {
+          if (!currentUserId) return;
+          return refreshJobs(currentUserId);
+        })
+        .catch(() => {});
     }, JOB_REFRESH_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      fastRefreshTimers.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      if (focusHandler) window.removeEventListener("focus", focusHandler);
+      if (visibilityHandler) {
+        document.removeEventListener("visibilitychange", visibilityHandler);
+      }
       if (channel) supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [authLoading, user?.id]);
 
   async function loadMaterials() {
     await getAllMaterials();

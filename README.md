@@ -108,6 +108,25 @@
 
 新增 input / textarea 时，一律使用 `text-base` 或更大字号，禁止在移动端可见的输入框使用 `text-sm`。
 
+### 确认对话框规则
+
+**破坏性操作（删除、清空等）统一使用浏览器原生 `confirm()` 弹窗**，不做内联确认 UI。
+
+- 简洁：无需额外状态管理
+- 一致：系统级弹窗，用户习惯明确
+- 已应用：素材导入页失败任务删除（`confirm("确定删除这条失败任务？")`）
+
+新增删除类操作时，直接在 `onClick` 里调用 `if (!confirm("...")) return;`，无需自定义弹窗组件。
+
+### 设置页云端同步（`app/settings/page.tsx`）
+
+- API Key 填写后**自动本地保存**（localStorage），并在 1 秒防抖后静默同步到 Supabase `user_settings` 表
+- 页面底部提供**手动「保存设置」按钮**（`CloudUpload` 图标），调用 `forceSave()` 立即同步，不等防抖
+- 按钮状态反馈：保存中 → 已保存（绿色）→ 3 秒后恢复；未登录时提示登录；失败时红色提示
+- 换设备登录后，页面加载时自动拉取云端设置（远端数据优先），API Key 无需重新填写
+
+`forceSave` 实现位置：`lib/hooks/use-settings.ts`，返回 `"ok" | "not_logged_in" | "error"`。
+
 ---
 
 ## 四大核心功能

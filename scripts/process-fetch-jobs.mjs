@@ -123,6 +123,7 @@ function detectUrlType(url) {
   if (/(?:x\.com|twitter\.com)/i.test(url)) return "twitter";
   if (/zhihu\.com/i.test(url)) return "zhihu";
   if (/mp\.weixin\.qq\.com/i.test(url)) return "wechat";
+  if (/(?:xiaohongshu\.com|xhslink\.com)/i.test(url)) return "xiaohongshu";
   return "generic";
 }
 

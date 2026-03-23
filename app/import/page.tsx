@@ -163,6 +163,7 @@ export default function ImportPage() {
   const [fetchedSources, setFetchedSources] = useState<FetchedSource[]>([]);
   const [queuedJobs, setQueuedJobs] = useState<QueuedJob[]>([]);
   const [authError, setAuthError] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const urlSubmitDisabled = !urlInput.trim();
   const lastJobSignatureRef = useRef("");
 
@@ -313,6 +314,13 @@ export default function ImportPage() {
 
   async function loadMaterials() {
     await getAllMaterials();
+  }
+
+  async function deleteJob(id: string) {
+    const supabase = createClient();
+    await supabase.from("content_fetch_jobs").delete().eq("id", id);
+    setQueuedJobs((prev) => prev.filter((j) => j.id !== id));
+    setConfirmDeleteId(null);
   }
 
   async function fetchAndExtract(
@@ -580,6 +588,36 @@ export default function ImportPage() {
                   </p>
                   {job.status === "failed" && job.error && (
                     <p className="mt-2 text-xs text-red-400">{job.error}</p>
+                  )}
+                  {job.status === "failed" && (
+                    <div className="mt-2">
+                      {confirmDeleteId === job.id ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--muted-foreground)]">
+                            确认删除？
+                          </span>
+                          <button
+                            onClick={() => deleteJob(job.id)}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            确认
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(job.id)}
+                          className="text-xs text-[var(--muted-foreground)] hover:text-red-400 transition-colors"
+                        >
+                          删除
+                        </button>
+                      )}
+                    </div>
                   )}
                   {job.status === "completed" && (
                     <p className="mt-2 text-xs text-emerald-400">

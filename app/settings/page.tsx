@@ -3,16 +3,39 @@
 import { useState } from "react";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { LoginCard } from "@/components/auth/login-card";
-import { Eye, EyeOff, Check, AlertCircle, Mic } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Check,
+  AlertCircle,
+  Mic,
+  CloudUpload,
+} from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export default function SettingsPage() {
-  const { settings, syncing, synced, updateProvider, setActiveProvider } =
-    useSettings();
+  const {
+    settings,
+    syncing,
+    synced,
+    updateProvider,
+    setActiveProvider,
+    forceSave,
+  } = useSettings();
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [testStatus, setTestStatus] = useState<
     Record<string, "idle" | "testing" | "success" | "error">
   >({});
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "ok" | "not_logged_in" | "error"
+  >("idle");
+
+  async function handleForceSave() {
+    setSaveStatus("saving");
+    const result = await forceSave();
+    setSaveStatus(result);
+    setTimeout(() => setSaveStatus("idle"), 3000);
+  }
 
   async function testConnection(providerId: string) {
     const provider = settings.providers.find((p) => p.id === providerId);
@@ -85,7 +108,7 @@ export default function SettingsPage() {
       </div>
 
       {/* AI Providers */}
-      <div className="space-y-4">
+      <div className="space-y-4 mb-8">
         {settings.providers.map((provider) => {
           const isActive = settings.activeProviderId === provider.id;
           const status = testStatus[provider.id] || "idle";
@@ -196,6 +219,38 @@ export default function SettingsPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* Save Button */}
+      <div className="border-t border-[var(--border)] pt-6 flex items-center justify-between">
+        <p className="text-xs text-[var(--muted-foreground)]">
+          {saveStatus === "ok" && "✓ 已同步到云端，多端登录后自动恢复"}
+          {saveStatus === "not_logged_in" && "⚠ 请先登录 Google 才能云端同步"}
+          {saveStatus === "error" && "✗ 同步失败，请检查网络或重试"}
+          {saveStatus === "idle" && synced && "上次同步成功"}
+          {saveStatus === "idle" &&
+            !synced &&
+            "登录后点击保存，API Key 加密同步到云端"}
+        </p>
+        <button
+          onClick={handleForceSave}
+          disabled={saveStatus === "saving"}
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50",
+            saveStatus === "ok"
+              ? "bg-emerald-500/20 text-emerald-400"
+              : saveStatus === "error" || saveStatus === "not_logged_in"
+                ? "bg-red-500/20 text-red-400"
+                : "bg-[var(--primary)] text-white hover:opacity-90",
+          )}
+        >
+          <CloudUpload className="h-4 w-4" />
+          {saveStatus === "saving"
+            ? "保存中..."
+            : saveStatus === "ok"
+              ? "已保存"
+              : "保存设置"}
+        </button>
       </div>
     </div>
   );

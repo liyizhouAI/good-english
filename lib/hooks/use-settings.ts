@@ -7,7 +7,10 @@ import {
   DEFAULT_PROVIDERS,
 } from "@/lib/types/provider";
 import { createClient } from "@/lib/supabase/client";
-import { loadRemoteSettings, saveRemoteSettings } from "@/lib/supabase/settings-sync";
+import {
+  loadRemoteSettings,
+  saveRemoteSettings,
+} from "@/lib/supabase/settings-sync";
 
 const SETTINGS_KEY = "good-english-settings";
 
@@ -25,14 +28,18 @@ function loadLocalSettings(): AppSettings {
     if (stored) {
       const parsed: AppSettings = JSON.parse(stored);
       const existingIds = new Set(parsed.providers.map((p) => p.id));
-      const newProviders = DEFAULT_PROVIDERS.filter((p) => !existingIds.has(p.id));
+      const newProviders = DEFAULT_PROVIDERS.filter(
+        (p) => !existingIds.has(p.id),
+      );
       return {
         activeProviderId: parsed.activeProviderId ?? "qwen",
         voiceProviderId: parsed.voiceProviderId ?? "openai",
         providers: [...parsed.providers, ...newProviders],
       };
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return DEFAULT_SETTINGS;
 }
 
@@ -115,7 +122,9 @@ export function useSettings() {
     });
 
     // Re-sync when auth state changes (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const local2 = loadLocalSettings();
         await syncSettings(local2);
@@ -157,34 +166,43 @@ export function useSettings() {
     }, 1000);
   }, []);
 
-  const updateProvider = useCallback((providerId: string, updates: Partial<ProviderConfig>) => {
-    setSettings((prev) => {
-      const next = {
-        ...prev,
-        providers: prev.providers.map((p) =>
-          p.id === providerId ? { ...p, ...updates } : p
-        ),
-      };
-      persistSettings(next);
-      return next;
-    });
-  }, [persistSettings]);
+  const updateProvider = useCallback(
+    (providerId: string, updates: Partial<ProviderConfig>) => {
+      setSettings((prev) => {
+        const next = {
+          ...prev,
+          providers: prev.providers.map((p) =>
+            p.id === providerId ? { ...p, ...updates } : p,
+          ),
+        };
+        persistSettings(next);
+        return next;
+      });
+    },
+    [persistSettings],
+  );
 
-  const setActiveProvider = useCallback((providerId: string) => {
-    setSettings((prev) => {
-      const next = { ...prev, activeProviderId: providerId };
-      persistSettings(next);
-      return next;
-    });
-  }, [persistSettings]);
+  const setActiveProvider = useCallback(
+    (providerId: string) => {
+      setSettings((prev) => {
+        const next = { ...prev, activeProviderId: providerId };
+        persistSettings(next);
+        return next;
+      });
+    },
+    [persistSettings],
+  );
 
-  const setVoiceProvider = useCallback((voiceProviderId: "openai" | "minimax") => {
-    setSettings((prev) => {
-      const next = { ...prev, voiceProviderId };
-      persistSettings(next);
-      return next;
-    });
-  }, [persistSettings]);
+  const setVoiceProvider = useCallback(
+    (voiceProviderId: "openai" | "minimax") => {
+      setSettings((prev) => {
+        const next = { ...prev, voiceProviderId };
+        persistSettings(next);
+        return next;
+      });
+    },
+    [persistSettings],
+  );
 
   const getActiveProvider = useCallback((): ProviderConfig | undefined => {
     return settings.providers.find((p) => p.id === settings.activeProviderId);
@@ -192,6 +210,26 @@ export function useSettings() {
 
   const getVoiceProvider = useCallback((): ProviderConfig | undefined => {
     return settings.providers.find((p) => p.id === settings.voiceProviderId);
+  }, [settings]);
+
+  // Immediate save (no debounce) — used by the manual "保存设置" button
+  const forceSave = useCallback(async (): Promise<
+    "ok" | "not_logged_in" | "error"
+  > => {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return "not_logged_in";
+    try {
+      saveLocalSettings(settings);
+      await withTimeout(
+        saveRemoteSettings(supabase, settings),
+        SYNC_TIMEOUT_MS,
+      );
+      setSynced(true);
+      return "ok";
+    } catch {
+      return "error";
+    }
   }, [settings]);
 
   return {
@@ -203,5 +241,6 @@ export function useSettings() {
     setVoiceProvider,
     getActiveProvider,
     getVoiceProvider,
+    forceSave,
   };
 }

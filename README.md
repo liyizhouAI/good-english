@@ -34,6 +34,82 @@
 
 ---
 
+## UI 设计规范
+
+> 以下为当前已落地的设计决策，升级迭代时请保持一致。
+
+### 色彩系统（深色主题，`app/globals.css`）
+
+| Token | 值 | 用途 |
+|-------|----|------|
+| `--background` | `#0a0a0f` | 页面底色 |
+| `--foreground` | `#e4e4e7` | 主文字 |
+| `--card` | `#141419` | 卡片 / 侧边栏背景 |
+| `--primary` | `#6366f1` | 主操作色（按钮、激活态） |
+| `--accent` | `#10b981` | 成功 / 完成状态 |
+| `--muted` | `#27272a` | 分割线、次级区块 |
+| `--muted-foreground` | `#71717a` | 辅助文字、占位符 |
+| `--border` | `#27272a` | 边框 |
+| `--destructive` | `#ef4444` | 警告 / 红标 |
+
+### 字体（`app/layout.tsx` + `app/globals.css`）
+
+| 角色 | 字体 | CSS 变量 | 中文 fallback |
+|------|------|----------|---------------|
+| 正文 / 代码 | JetBrains Mono 400/500/700 | `--font-mono` | Noto Sans SC → PingFang SC → system-ui |
+| 标题 | Lora 400/700 | `--font-serif` | Noto Serif SC → Georgia |
+
+**行高 Token**（CSS 变量，统一应用到全站）：
+
+```css
+--leading-body:    1.65   /* p / li / body */
+--leading-heading: 1.25   /* h1–h6 */
+--leading-tight:   1.4    /* button / label / small */
+```
+
+### Logo 系统（`components/ui/logo.tsx`）
+
+**Banner Logo**（移动端顶栏）
+- 组件：`<LogoBanner />`
+- 渲染方式：SVG 像素艺术，`p=3 gap=2`，`fixedHeight=22`（高度固定 22px，宽度按比例自适应 ~188px）
+- 字母网格：5×7 像素点阵，含 1px 3D 阴影 + 1px 顶部高光
+- 颜色：`GOOD` → `#7A8694`（灰），`ENGLISH` → `#C0CDD8`（浅白），阴影 → `#06090C`
+
+**页面标题 Heading**（仪表盘 `/`）
+- 组件：`<GoodEnglishHeading />`
+- 渲染方式：HTML `<h1>` 文本，字体 `var(--font-mono)`，`font-weight: 700`，`font-size: 1.6rem`，`letter-spacing: 0.04em`
+- 不使用 SVG，是普通可选中的文本标题
+
+### 布局（`components/layout/sidebar.tsx` + `app/layout.tsx`）
+
+**侧边栏**
+- 桌面展开宽：`md:w-56`（224px）；折叠宽：`md:w-16`（64px）
+- 折叠/展开切换按钮在底部 footer
+- 侧边栏内**不放 logo，不放 slogan**，只有导航项
+
+**移动端顶部 Banner**
+- 固定高度：`h-12`（48px），`z-40`，背景 `var(--card)`
+- 包含：汉堡菜单按钮（`h-5 w-5`）+ `<LogoBanner />`
+- 不随页面滚动（`position: fixed`）
+
+**主内容区偏移**（防 banner 遮挡）
+- 移动端：`pt-[50px]`（48px banner + 2px 呼吸空间）
+- 桌面端：`md:pt-6`（正常 padding，无 banner）
+
+### iOS Safari 防自动缩放规则
+
+> iOS Safari 对字号 < 16px 的 input / textarea 获得焦点时会自动放大页面。
+
+**规则：所有用户可编辑的输入框字号必须 ≥ 16px（`text-base`）**
+
+已修复的位置：
+- `app/import/page.tsx`：URL 输入框、文本输入框 → `text-base`
+- `app/settings/page.tsx`：API Key 输入框 → `text-base`
+
+新增 input / textarea 时，一律使用 `text-base` 或更大字号，禁止在移动端可见的输入框使用 `text-sm`。
+
+---
+
 ## 四大核心功能
 
 ### 1. 素材导入 & 智能提取（`/import`）

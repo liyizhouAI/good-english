@@ -176,7 +176,16 @@ export default function ChatPage() {
         body: JSON.stringify({
           messages: newMessages.map((m) => ({
             role: m.role,
-            content: m.content,
+            // Reconstruct JSON for assistant messages so the model sees the
+            // correct response pattern and keeps producing structured output
+            content:
+              m.role === "assistant" && m.feedback
+                ? JSON.stringify({
+                    reply: m.content,
+                    corrections: m.corrections ?? [],
+                    feedback: m.feedback,
+                  })
+                : m.content,
           })),
           provider,
           systemPrompt,

@@ -48,6 +48,7 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -59,6 +60,10 @@ export default function ChatPage() {
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current) return;
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
     setIsRecording(false);
 
     return new Promise<void>((resolve) => {
@@ -137,10 +142,18 @@ export default function ChatPage() {
       recorder.start(100);
       setIsRecording(true);
       setError("");
+
+      // Auto-stop after 3 minutes of no manual action
+      recordingTimerRef.current = setTimeout(
+        () => {
+          stopRecording();
+        },
+        3 * 60 * 1000,
+      );
     } catch {
       setError("无法访问麦克风，请检查系统权限");
     }
-  }, []);
+  }, [stopRecording]);
 
   const toggleRecording = useCallback(() => {
     if (isRecording) {

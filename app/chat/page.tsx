@@ -213,18 +213,23 @@ export default function ChatPage() {
           const partialReply = partialMatch[1]
             .replace(/\\n/g, "\n")
             .replace(/\\"/g, '"')
-            .replace(/\\t/g, "\t");
-          setMessages([
-            ...newMessages,
-            { role: "assistant", content: partialReply },
-          ]);
+            .replace(/\\t/g, "\t")
+            .replace(/<think>[\s\S]*?<\/think>/gi, "")
+            .replace(/<think>[\s\S]*/gi, ""); // strip unclosed think blocks too
+          if (partialReply.trim()) {
+            setMessages([
+              ...newMessages,
+              { role: "assistant", content: partialReply },
+            ]);
+          }
         }
       }
 
-      // Strip <think>...</think> reasoning blocks before parsing
-      const cleanedText = fullText
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .trim();
+      // Helper: strip all <think>...</think> blocks from any string
+      const stripThink = (s: string) =>
+        s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+      const cleanedText = stripThink(fullText);
 
       let parsedMsg: ChatMsg = { role: "assistant", content: cleanedText };
       try {
@@ -234,7 +239,8 @@ export default function ChatPage() {
           if (parsed.reply) {
             parsedMsg = {
               role: "assistant",
-              content: parsed.reply,
+              // Also strip think tags if they appear inside the reply field
+              content: stripThink(parsed.reply),
               corrections: parsed.corrections,
               feedback: parsed.feedback,
             };

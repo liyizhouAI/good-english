@@ -13,10 +13,13 @@ import {
   ChevronRight,
   Menu,
   X,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 import { LogoBanner } from "@/components/ui/logo";
 import { cn } from "@/lib/utils/cn";
 import { useState, useEffect } from "react";
+import { useViewMode } from "./view-mode-context";
 
 const NAV_ITEMS = [
   { href: "/", labelCn: "仪表盘", icon: LayoutDashboard },
@@ -31,6 +34,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { viewMode, toggleViewMode } = useViewMode();
+  const isMobile = viewMode === "mobile";
 
   useEffect(() => {
     setCollapsed(window.innerWidth < 768);
@@ -111,8 +116,28 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* ── Footer: collapse toggle ── */}
-        <div className="border-t border-[var(--border)] px-3 py-3 flex justify-end">
+        {/* ── Footer: view mode toggle + collapse toggle ── */}
+        <div className="border-t border-[var(--border)] px-3 py-3 flex items-center justify-between">
+          {/* Mobile/desktop view toggle (desktop only) */}
+          <button
+            onClick={toggleViewMode}
+            className="hidden md:flex items-center justify-center p-1.5 rounded-lg hover:bg-[var(--secondary)] transition-colors"
+            title={
+              isMobile
+                ? "切换到电脑端视图"
+                : "切换到手机端视图 (iPhone 17 Pro Max)"
+            }
+            style={{
+              color: isMobile ? "var(--primary)" : "var(--muted-foreground)",
+            }}
+          >
+            {isMobile ? (
+              <Smartphone className="h-4 w-4" />
+            ) : (
+              <Monitor className="h-4 w-4" />
+            )}
+          </button>
+          {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="hidden md:flex items-center justify-center p-1.5 rounded-lg hover:bg-[var(--secondary)] text-[var(--muted-foreground)]"

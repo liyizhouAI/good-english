@@ -25,7 +25,13 @@ const DEFAULT_FETCHER_SCRIPT =
   "/Users/liyizhouai/Desktop/openclaw/skill/内容抓取/scripts/fetch.py";
 const DEFAULT_FETCHER_PYTHON = "/opt/homebrew/bin/python3";
 
-export type UrlType = "youtube" | "twitter" | "zhihu" | "wechat" | "generic";
+export type UrlType =
+  | "youtube"
+  | "twitter"
+  | "zhihu"
+  | "wechat"
+  | "xiaohongshu"
+  | "generic";
 
 export interface FetchedUrlResult {
   url: string;
@@ -37,7 +43,11 @@ export interface FetchedUrlResult {
   contentType: UrlType;
   archivePath?: string;
   archiveRelativePath?: string;
-  fetchMethod: "content-fetcher" | "youtube-transcript" | "jina-reader" | "readability";
+  fetchMethod:
+    | "content-fetcher"
+    | "youtube-transcript"
+    | "jina-reader"
+    | "readability";
   isLong?: boolean;
   warning?: string;
 }
@@ -74,7 +84,10 @@ function quoteYaml(value: string): string {
 }
 
 function collapseWhitespace(value: string): string {
-  return value.replace(/\r/g, "").replace(/[ \t]+\n/g, "\n").trim();
+  return value
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
 }
 
 function stripFrontmatter(markdown: string): string {
@@ -98,14 +111,19 @@ function stripMarkdown(markdown: string): string {
     .trim();
 }
 
-function extractFrontmatterValue(markdown: string, key: string): string | undefined {
+function extractFrontmatterValue(
+  markdown: string,
+  key: string,
+): string | undefined {
   const pattern = new RegExp(`^${key}:\\s*"?([^"\\n]+)"?$`, "m");
   const match = markdown.match(pattern);
   return match?.[1]?.trim();
 }
 
 function extractBodyFromMarkdown(markdown: string): string {
-  const transcriptMatch = markdown.match(/##\s+📝\s+全文逐字稿\s*\n([\s\S]+?)(?:\n🏷️|$)/);
+  const transcriptMatch = markdown.match(
+    /##\s+📝\s+全文逐字稿\s*\n([\s\S]+?)(?:\n🏷️|$)/,
+  );
   if (transcriptMatch?.[1]) {
     return collapseWhitespace(transcriptMatch[1]);
   }
@@ -123,6 +141,7 @@ function detectUrlType(url: string): UrlType {
   if (/(?:x\.com|twitter\.com)/i.test(url)) return "twitter";
   if (/zhihu\.com/i.test(url)) return "zhihu";
   if (/mp\.weixin\.qq\.com/i.test(url)) return "wechat";
+  if (/(?:xiaohongshu\.com|xhslink\.com)/i.test(url)) return "xiaohongshu";
   return "generic";
 }
 
@@ -172,8 +191,7 @@ function resolveArchiveRoot(): { root: string; warning?: string } {
       mkdirSync(candidate, { recursive: true });
       accessSync(candidate, constants.W_OK);
       const warning =
-        candidate.startsWith(os.tmpdir()) ||
-        candidate !== defaultRoot
+        candidate.startsWith(os.tmpdir()) || candidate !== defaultRoot
           ? `当前环境无法稳定写入项目目录，已写入 ${candidate}`
           : undefined;
       return { root: candidate, warning };
@@ -194,7 +212,11 @@ function buildArchiveStem(url: string, type: UrlType, title?: string): string {
   ].join("_");
 }
 
-function rewriteAssetPaths(markdown: string, fromDir: string, toDir: string): string {
+function rewriteAssetPaths(
+  markdown: string,
+  fromDir: string,
+  toDir: string,
+): string {
   if (!fromDir || fromDir === toDir) return markdown;
   const escaped = fromDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return markdown.replace(new RegExp(escaped, "g"), toDir);
@@ -207,13 +229,22 @@ function archiveGeneratedMarkdown(params: {
   markdown: string;
   sourceAssetDir?: string;
   sourceAssetDirName?: string;
-}): { archivePath?: string; archiveRelativePath?: string; warning?: string; markdown: string } {
+}): {
+  archivePath?: string;
+  archiveRelativePath?: string;
+  warning?: string;
+  markdown: string;
+} {
   const archive = resolveArchiveRoot();
   const stem = buildArchiveStem(params.url, params.contentType, params.title);
   const markdownPath = path.join(archive.root, `${stem}.md`);
   let finalMarkdown = params.markdown;
 
-  if (params.sourceAssetDir && params.sourceAssetDirName && existsSync(params.sourceAssetDir)) {
+  if (
+    params.sourceAssetDir &&
+    params.sourceAssetDirName &&
+    existsSync(params.sourceAssetDir)
+  ) {
     const targetAssetDirName = `${stem}-media`;
     const targetAssetDir = path.join(archive.root, targetAssetDirName);
     rmSync(targetAssetDir, { recursive: true, force: true });
@@ -250,7 +281,8 @@ function buildStructuredMarkdown(params: {
   if (params.author) lines.push(`author: ${quoteYaml(params.author)}`);
   lines.push(`url: ${params.url}`);
   lines.push(`fetched_at: ${new Date().toISOString()}`);
-  if (params.publishedAt) lines.push(`published_at: ${quoteYaml(params.publishedAt)}`);
+  if (params.publishedAt)
+    lines.push(`published_at: ${quoteYaml(params.publishedAt)}`);
   lines.push(`fetch_method: ${params.fetchMethod}`);
   lines.push("---");
   lines.push("");
@@ -263,7 +295,10 @@ function buildStructuredMarkdown(params: {
   return lines.join("\n");
 }
 
-async function fetchViaContentFetcher(url: string, type: UrlType): Promise<FetchedUrlResult> {
+async function fetchViaContentFetcher(
+  url: string,
+  type: UrlType,
+): Promise<FetchedUrlResult> {
   const scriptPath = resolveFetcherScriptPath();
   if (!scriptPath) {
     throw new Error("Content Fetcher 脚本不可用");
@@ -275,10 +310,14 @@ async function fetchViaContentFetcher(url: string, type: UrlType): Promise<Fetch
     const args = [scriptPath, url, "-o", tempDir];
     if (type === "zhihu") args.push("--show-browser");
 
-    const { stdout, stderr } = await execFileAsync(resolveFetcherPython(), args, {
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const { stdout, stderr } = await execFileAsync(
+      resolveFetcherPython(),
+      args,
+      {
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
 
     const match = stdout.match(/完成!\s+(.+\.md)/);
     if (!match) {
@@ -298,7 +337,9 @@ async function fetchViaContentFetcher(url: string, type: UrlType): Promise<Fetch
       contentType: type,
       markdown: sourceMarkdown,
       sourceAssetDir: existsSync(sourceAssetDir) ? sourceAssetDir : undefined,
-      sourceAssetDirName: existsSync(sourceAssetDir) ? sourceAssetDirName : undefined,
+      sourceAssetDirName: existsSync(sourceAssetDir)
+        ? sourceAssetDirName
+        : undefined,
     });
 
     return {
@@ -380,7 +421,10 @@ async function fetchYouTubeFallback(url: string): Promise<FetchedUrlResult> {
   };
 }
 
-async function fetchViaJinaReader(url: string, type: UrlType): Promise<FetchedUrlResult> {
+async function fetchViaJinaReader(
+  url: string,
+  type: UrlType,
+): Promise<FetchedUrlResult> {
   const response = await fetch(`${REMOTE_READER_PREFIX}${url}`, {
     headers: { Accept: "text/plain" },
   });
@@ -391,7 +435,9 @@ async function fetchViaJinaReader(url: string, type: UrlType): Promise<FetchedUr
   }
 
   const warning = raw.match(/^Warning:\s*(.+)$/m)?.[1]?.trim();
-  const markdownSection = raw.match(/Markdown Content:\n([\s\S]+)$/)?.[1]?.trim();
+  const markdownSection = raw
+    .match(/Markdown Content:\n([\s\S]+)$/)?.[1]
+    ?.trim();
   const title = raw.match(/^Title:\s*(.*)$/m)?.[1]?.trim();
 
   if (!markdownSection) {
@@ -402,10 +448,7 @@ async function fetchViaJinaReader(url: string, type: UrlType): Promise<FetchedUr
     throw new Error(`远程正文提取不可用：${warning}`);
   }
 
-  if (
-    type === "wechat" &&
-    /Parameter error/i.test(markdownSection)
-  ) {
+  if (type === "wechat" && /Parameter error/i.test(markdownSection)) {
     throw new Error("公众号正文提取失败");
   }
 
@@ -525,6 +568,18 @@ export async function fetchUrlContent(url: string): Promise<FetchedUrlResult> {
 
     throw new Error(
       `${type === "twitter" ? "X / Twitter" : type === "zhihu" ? "知乎" : "微信公众号"} 抓取失败：${errors.join("；") || "未知错误"}。本地运行时请确保 Content Fetcher 可用；线上环境对这类站点通常会受限。`,
+    );
+  }
+
+  if (type === "xiaohongshu") {
+    try {
+      return await fetchViaContentFetcher(url, type);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+
+    throw new Error(
+      `小红书抓取失败：${errors.join("；") || "未知错误"}。请确保已运行 python3 fetch.py --login-xhs 完成授权，或 session 已过期需重新登录。`,
     );
   }
 

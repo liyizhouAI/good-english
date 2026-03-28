@@ -378,7 +378,7 @@ export default function ChatPage() {
 
   // Chat screen
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)] max-w-2xl mx-auto">
+    <div className="flex flex-col h-[calc(100vh-5.5rem)] md:h-[calc(100vh-3rem)] max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <h1 className="text-lg font-bold">与 {persona.name} 对话</h1>

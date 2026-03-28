@@ -38,6 +38,7 @@ type UrlContentType =
   | "twitter"
   | "zhihu"
   | "wechat"
+  | "xiaohongshu"
   | "generic"
   | null;
 
@@ -101,11 +102,20 @@ function clearCachedJobs() {
   }
 }
 
+const EMBEDDED_URL_RE = /https?:\/\/[^\s\u4e00-\u9fa5，。！？、""''【】《》]+/;
+
+function extractUrl(line: string): string | null {
+  const trimmed = line.trim();
+  if (trimmed.startsWith("http")) return trimmed;
+  const match = trimmed.match(EMBEDDED_URL_RE);
+  return match ? match[0].replace(/[.,!?）)]+$/, "") : null;
+}
+
 function parseUrls(input: string): string[] {
   return input
     .split("\n")
-    .map((s) => s.trim())
-    .filter((s) => s.startsWith("http"))
+    .map(extractUrl)
+    .filter((u): u is string => u !== null)
     .slice(0, MAX_BATCH_URLS);
 }
 
@@ -114,6 +124,7 @@ function urlTypeLabel(type: UrlContentType): string {
   if (type === "twitter") return "🐦 X / Twitter";
   if (type === "zhihu") return "📚 知乎";
   if (type === "wechat") return "💬 微信公众号";
+  if (type === "xiaohongshu") return "📕 小红书";
   return "🌐 网页";
 }
 
@@ -122,6 +133,7 @@ function detectUrlType(url: string): UrlContentType {
   if (/(?:x\.com|twitter\.com)/i.test(url)) return "twitter";
   if (/zhihu\.com/i.test(url)) return "zhihu";
   if (/mp\.weixin\.qq\.com/i.test(url)) return "wechat";
+  if (/(?:xiaohongshu\.com|xhslink\.com)/i.test(url)) return "xiaohongshu";
   if (url.startsWith("http")) return "generic";
   return null;
 }
@@ -332,6 +344,7 @@ export default function ImportPage() {
       twitter: "🐦 正在抓取全文...",
       zhihu: "📚 正在抓取知乎...",
       wechat: "💬 正在抓取公众号...",
+      xiaohongshu: "📕 正在抓取小红书...",
       generic: "🌐 正在抓取网页...",
     };
     setExtractingMsg(fetchMsgs[urlType ?? "generic"]);

@@ -44,6 +44,13 @@ const REASONING_FALLBACK: Record<string, string> = {
   "kimi-k2.5": "moonshot-v1-32k",
 };
 
+/**
+ * Providers whose compatible-mode endpoints do not support the OpenAI
+ * JSON-schema structured-output parameter used by generateObject.
+ * These providers skip Strategy 1 and go straight to generateText.
+ */
+const TEXT_ONLY_PROVIDERS = new Set(["qwen"]);
+
 /** Strip reasoning/thinking token blocks from model text output */
 function stripThinking(text: string): string {
   return text
@@ -113,24 +120,29 @@ export async function POST(req: Request) {
   const prompt = `Analyze the following content and extract vocabulary, sentence patterns, and key phrases:\n\n${truncated}`;
 
   // ── Strategy 1: generateObject — structured JSON mode (MiniMax M2.7, GPT, Claude) ──
-  try {
-    const { object } = await generateObject({
-      model,
-      schema: ExtractionSchema,
-      system: EXTRACTION_SYSTEM_PROMPT,
-      prompt,
-    });
-    return Response.json(object);
-  } catch (err) {
-    console.log(
-      "[extract] generateObject failed, falling back to generateText:",
-      err instanceof Error ? err.message : String(err),
-    );
+  // Skipped for providers that don't support OpenAI JSON-schema mode (e.g. Qwen).
+  if (!TEXT_ONLY_PROVIDERS.has(provider.id)) {
+    try {
+      const { object } = await generateObject({
+        model,
+        schema: ExtractionSchema,
+        system: EXTRACTION_SYSTEM_PROMPT,
+        prompt,
+      });
+      return Response.json(object);
+    } catch (err) {
+      console.log(
+        "[extract] generateObject failed, falling back to generateText:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   }
 
   // ── Strategy 2: generateText — override reasoning models first ──
   const fallbackModelId = REASONING_FALLBACK[provider.defaultModel];
-  const textModel = fallbackModelId ? getModel(provider, fallbackModelId) : model;
+  const textModel = fallbackModelId
+    ? getModel(provider, fallbackModelId)
+    : model;
 
   if (fallbackModelId) {
     console.log(
@@ -167,6 +179,9 @@ export async function POST(req: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[extract] generateText error:", msg);
-    return Response.json({ error: `Extraction failed: ${msg}` }, { status: 500 });
+    return Response.json(
+      { error: `Extraction failed: ${msg}` },
+      { status: 500 },
+    );
   }
 }

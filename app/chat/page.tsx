@@ -199,10 +199,16 @@ export default function ChatPage() {
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
 
+        // Skip streaming while inside a <think> block
+        const inThinkBlock =
+          /<think>/i.test(fullText) && !/<\/think>/i.test(fullText);
+        if (inThinkBlock) continue;
+
         // Stream the partial reply in real-time by extracting it from partial JSON
+        const stripped = fullText.replace(/<think>[\s\S]*?<\/think>/gi, "");
         const partialMatch =
-          fullText.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/s) ||
-          fullText.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/s);
+          stripped.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/s) ||
+          stripped.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/s);
         if (partialMatch) {
           const partialReply = partialMatch[1]
             .replace(/\\n/g, "\n")
@@ -215,9 +221,14 @@ export default function ChatPage() {
         }
       }
 
-      let parsedMsg: ChatMsg = { role: "assistant", content: fullText };
+      // Strip <think>...</think> reasoning blocks before parsing
+      const cleanedText = fullText
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .trim();
+
+      let parsedMsg: ChatMsg = { role: "assistant", content: cleanedText };
       try {
-        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.reply) {

@@ -191,10 +191,28 @@ export default function ChatPage() {
       let fullText = "";
       const decoder = new TextDecoder();
 
+      // Show a placeholder immediately so the user sees the bot is responding
+      setMessages([...newMessages, { role: "assistant", content: "" }]);
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
+
+        // Stream the partial reply in real-time by extracting it from partial JSON
+        const partialMatch =
+          fullText.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/s) ||
+          fullText.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/s);
+        if (partialMatch) {
+          const partialReply = partialMatch[1]
+            .replace(/\\n/g, "\n")
+            .replace(/\\"/g, '"')
+            .replace(/\\t/g, "\t");
+          setMessages([
+            ...newMessages,
+            { role: "assistant", content: partialReply },
+          ]);
+        }
       }
 
       let parsedMsg: ChatMsg = { role: "assistant", content: fullText };
@@ -451,20 +469,26 @@ export default function ChatPage() {
                 <div className="mt-3 pt-3 border-t border-[var(--border)]/50">
                   <div className="flex gap-3 text-xs">
                     <span>
-                      流利度:{" "}
+                      <span className="text-[var(--muted-foreground)]">
+                        流利度：
+                      </span>
                       <span className="text-[var(--primary)] font-medium">
                         {msg.feedback.fluency}/10
                       </span>
                     </span>
                     <span>
-                      词汇:{" "}
-                      <span className="text-[var(--primary)] font-medium">
+                      <span className="text-[var(--muted-foreground)]">
+                        词汇：
+                      </span>
+                      <span className="text-sky-400 font-medium">
                         {msg.feedback.vocabulary}/10
                       </span>
                     </span>
                     <span>
-                      语法:{" "}
-                      <span className="text-[var(--primary)] font-medium">
+                      <span className="text-[var(--muted-foreground)]">
+                        语法：
+                      </span>
+                      <span className="text-emerald-400 font-medium">
                         {msg.feedback.grammar}/10
                       </span>
                     </span>

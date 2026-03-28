@@ -416,7 +416,14 @@ export default function ChatPage() {
                   : "bg-[var(--card)] border border-[var(--border)]",
               )}
             >
-              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              <p
+                className={cn(
+                  "text-sm whitespace-pre-wrap",
+                  msg.role === "assistant" && "font-mono leading-relaxed",
+                )}
+              >
+                {msg.content}
+              </p>
 
               {msg.corrections && msg.corrections.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-[var(--border)]/50 space-y-2">

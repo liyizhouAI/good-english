@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Lora, JetBrains_Mono } from "next/font/google";
-import { Sidebar } from "@/components/layout/sidebar";
+import { LayoutClient } from "@/components/layout/layout-client";
 import "./globals.css";
 
 const lora = Lora({
@@ -31,12 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${lora.variable} ${mono.variable}`}>
       <body className="antialiased">
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 pt-[50px] md:pt-6">
-            {children}
-          </main>
-        </div>
+        <LayoutClient>{children}</LayoutClient>
       </body>
     </html>
   );

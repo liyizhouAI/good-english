@@ -1,21 +1,6 @@
 import type { Metadata } from "next";
-import { Lora, JetBrains_Mono } from "next/font/google";
 import { LayoutClient } from "@/components/layout/layout-client";
 import "./globals.css";
-
-const lora = Lora({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-serif",
-  display: "swap",
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Good English - 好英语",
@@ -29,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`dark ${lora.variable} ${mono.variable}`}>
+    <html lang="en" className="dark">
       <body className="antialiased">
         <LayoutClient>{children}</LayoutClient>
       </body>

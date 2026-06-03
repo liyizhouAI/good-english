@@ -41,6 +41,10 @@ const ExtractionSchema = z.object({
  * variant from the same provider as a fallback.
  */
 const REASONING_FALLBACK: Record<string, string> = {
+  "deepseek-v4-pro": "deepseek-chat",
+  "deepseek-reasoner": "deepseek-chat",
+  "deepseek/deepseek-v4-pro": "deepseek/deepseek-chat",
+  "deepseek/deepseek-reasoner": "deepseek/deepseek-chat",
   "kimi-k2.5": "moonshot-v1-32k",
 };
 
@@ -49,7 +53,7 @@ const REASONING_FALLBACK: Record<string, string> = {
  * JSON-schema structured-output parameter used by generateObject.
  * These providers skip Strategy 1 and go straight to generateText.
  */
-const TEXT_ONLY_PROVIDERS = new Set(["qwen"]);
+const TEXT_ONLY_PROVIDERS = new Set(["qwen", "deepseek"]);
 
 /** Strip reasoning/thinking token blocks from model text output */
 function stripThinking(text: string): string {
@@ -119,8 +123,8 @@ export async function POST(req: Request) {
   const model = getModel(provider);
   const prompt = `Analyze the following content and extract vocabulary, sentence patterns, and key phrases:\n\n${truncated}`;
 
-  // ── Strategy 1: generateObject — structured JSON mode (MiniMax M2.7, GPT, Claude) ──
-  // Skipped for providers that don't support OpenAI JSON-schema mode (e.g. Qwen).
+  // ── Strategy 1: generateObject — structured JSON mode (GPT, Claude) ──
+  // Skipped for providers that don't support OpenAI JSON-schema mode (e.g. Qwen/DeepSeek).
   if (!TEXT_ONLY_PROVIDERS.has(provider.id)) {
     try {
       const { object } = await generateObject({

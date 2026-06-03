@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { LogoBanner } from "@/components/ui/logo";
 import { cn } from "@/lib/utils/cn";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useViewMode } from "./view-mode-context";
 
 const NAV_ITEMS = [
@@ -36,14 +36,6 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { viewMode, toggleViewMode } = useViewMode();
   const isMobile = viewMode === "mobile";
-
-  useEffect(() => {
-    setCollapsed(window.innerWidth < 768);
-  }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   return (
     <>
@@ -100,6 +92,7 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 title={item.labelCn}
+                onClick={() => setMobileOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   collapsed ? "md:justify-center md:px-0" : "",

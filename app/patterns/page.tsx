@@ -19,21 +19,45 @@ const SCENARIO_LABELS: Record<string, string> = {
   'interview': '采访',
 };
 
+function getCurrentTimestamp() {
+  return Date.now();
+}
+
+function getPatternData() {
+  return Promise.all([getAllPatterns(), getDuePatterns(50)]);
+}
+
 export default function PatternsPage() {
   const [patterns, setPatterns] = useState<PatternRecord[]>([]);
   const [duePatterns, setDuePatterns] = useState<PatternRecord[]>([]);
+  const [currentTime, setCurrentTime] = useState(() => getCurrentTimestamp());
   const [scenario, setScenario] = useState<ScenarioFilter>('all');
   const [reviewMode, setReviewMode] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [all, due] = await Promise.all([getAllPatterns(), getDuePatterns(50)]);
+    const [all, due] = await getPatternData();
     setPatterns(all);
     setDuePatterns(due);
+    setCurrentTime(getCurrentTimestamp());
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    let cancelled = false;
+    getPatternData()
+      .then(([all, due]) => {
+        if (cancelled) return;
+        setPatterns(all);
+        setDuePatterns(due);
+        setCurrentTime(getCurrentTimestamp());
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = scenario === 'all'
     ? patterns
@@ -49,11 +73,13 @@ export default function PatternsPage() {
       currentCard.interval,
       currentCard.repetitions,
     );
+    const reviewedAt = getCurrentTimestamp();
     await db.patterns.update(currentCard.id, {
       ...result,
-      lastReviewedAt: Date.now(),
-      updatedAt: Date.now(),
+      lastReviewedAt: reviewedAt,
+      updatedAt: reviewedAt,
     });
+    setCurrentTime(reviewedAt);
 
     if (currentIndex < duePatterns.length - 1) {
       setCurrentIndex(prev => prev + 1);
@@ -183,7 +209,7 @@ export default function PatternsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map(pattern => {
-            const isDue = pattern.nextReviewAt <= Date.now();
+            const isDue = pattern.nextReviewAt <= currentTime;
             return (
               <div
                 key={pattern.id}

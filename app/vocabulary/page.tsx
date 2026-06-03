@@ -30,9 +30,14 @@ type CategoryFilter = "all" | WordCategory;
 
 const supabase = createClient();
 
+function getCurrentTimestamp() {
+  return Date.now();
+}
+
 export default function VocabularyPage() {
   const [words, setWords] = useState<WordRecord[]>([]);
   const [dueWords, setDueWords] = useState<WordRecord[]>([]);
+  const [currentTime, setCurrentTime] = useState(() => getCurrentTimestamp());
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
@@ -43,6 +48,7 @@ export default function VocabularyPage() {
     const [all, due] = await Promise.all([getAllWords(), getDueWords(50)]);
     setWords(all);
     setDueWords(due);
+    setCurrentTime(getCurrentTimestamp());
   }, []);
 
   // Pull from cloud on mount, then load local
@@ -69,10 +75,12 @@ export default function VocabularyPage() {
       currentCard.interval,
       currentCard.repetitions,
     );
+    const reviewedAt = getCurrentTimestamp();
     await updateWord(currentCard.id, {
       ...result,
-      lastReviewedAt: Date.now(),
+      lastReviewedAt: reviewedAt,
     });
+    setCurrentTime(reviewedAt);
     pushLearningData(supabase).catch(() => {});
 
     if (currentCardIndex < dueWords.length - 1) {
@@ -275,7 +283,7 @@ export default function VocabularyPage() {
       ) : (
         <div className="space-y-2">
           {filteredWords.map((word) => {
-            const isDue = word.nextReviewAt <= Date.now();
+            const isDue = word.nextReviewAt <= currentTime;
             return (
               <div
                 key={word.id}

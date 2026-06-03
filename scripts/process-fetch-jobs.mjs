@@ -42,6 +42,8 @@ const POLL_INTERVAL_MS = Number(process.env.GOOD_ENGLISH_POLL_INTERVAL_MS || 600
 const EXTRACT_TIMEOUT_MS = Number(process.env.GOOD_ENGLISH_EXTRACT_TIMEOUT_MS || 120000);
 const EXTRACT_RETRY_COUNT = Number(process.env.GOOD_ENGLISH_EXTRACT_RETRY_COUNT || 3);
 const WATCH_MODE = process.argv.includes("--watch");
+const RETIRED_PROVIDER_IDS = new Set(["qwen", "minimax"]);
+const PROVIDER_PRIORITY = ["openai", "deepseek", "openrouter", "kimi"];
 
 if (!SERVICE_ROLE_KEY) {
   console.error("❌ Missing SUPABASE_SERVICE_ROLE_KEY");
@@ -307,9 +309,18 @@ async function getActiveProvider(userId) {
   }
 
   const settings = JSON.parse(data.settings_data);
-  const provider = settings.providers?.find(
-    (item) => item.id === settings.activeProviderId,
+  const providers = (settings.providers || []).filter(
+    (item) => !RETIRED_PROVIDER_IDS.has(item.id),
   );
+  const preferredProviderId = RETIRED_PROVIDER_IDS.has(settings.activeProviderId)
+    ? undefined
+    : settings.activeProviderId;
+  const provider =
+    providers.find((item) => item.id === preferredProviderId && item.apiKey) ||
+    PROVIDER_PRIORITY.map((providerId) =>
+      providers.find((item) => item.id === providerId && item.apiKey),
+    ).find(Boolean) ||
+    providers.find((item) => item.apiKey);
 
   if (!provider?.apiKey) {
     throw new Error("用户未配置可用的 AI Provider API Key");

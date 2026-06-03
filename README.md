@@ -2,7 +2,8 @@
 
 > 不是"学英语"，是从你认为好的英文内容中提取精华，用 AI 模拟真实硅谷场景对话，系统恢复高级英语表达和采访能力。
 
-**线上地址**：https://good-english-two.vercel.app
+**生产环境**：腾讯云 CVM（`foresight` / `124.223.92.72`）
+**备份预览**：https://good-english-two.vercel.app
 
 ---
 
@@ -16,7 +17,7 @@
 2. 用 SM-2 间隔重复算法管理复习计划
 3. AI 扮演 VC / 创始人 / 研究员，模拟真实硅谷对话
 4. 实时纠错 + 流利度评分
-5. 语音输入（OpenAI Whisper）
+5. 语音输入（浏览器内置识别默认，DashScope / OpenAI 备选）
 
 ---
 
@@ -29,8 +30,8 @@
 | 本地缓存 | Dexie.js (IndexedDB) |
 | 云端主存储 | Supabase（Auth + PostgreSQL） |
 | AI | Vercel AI SDK v6（多 Provider 抽象层） |
-| 语音识别 | OpenAI Whisper (`/api/transcribe`) |
-| 部署 | Vercel |
+| 语音识别 | 浏览器 Web Speech API / DashScope ASR / OpenAI Transcribe (`/api/transcribe`) |
+| 部署 | 腾讯云 CVM + Nginx + PM2（Vercel 保留为备份预览） |
 
 ---
 
@@ -148,7 +149,7 @@
 - 4 个角色：VC Partner / AI创始人 / AI研究员 / PM
 - 5 个场景：自我介绍 / AI趋势 / 创业商业 / 社交寒暄 / 媒体采访
 - 实时纠错 + 流利度/词汇/语法三维评分
-- 支持语音输入（需配置 OpenAI Key）
+- 支持语音输入（默认浏览器内置识别；API 备选可配 DashScope 或 OpenAI）
 
 ### 4. 句型训练（`/patterns`）
 - 按场景分类，融入 SM-2 复习系统
@@ -162,13 +163,25 @@ Settings 页面（`/settings`）配置，支持多个 Provider 自由切换。
 
 | Provider | 推荐模型 | 用途 |
 |----------|---------|------|
-| 阿里云百炼（Qwen） | qwen-plus | AI 对话（推荐，便宜） |
-| MiniMax | MiniMax-M2.7-highspeed | AI 对话（国内快） |
-| Kimi（月之暗面） | kimi-k2.5 | AI 对话 |
-| OpenAI | gpt-4o | AI 对话 + **语音识别（必须）** |
-| OpenRouter | claude-sonnet-4-6 | AI 对话（多模型聚合） |
+| DeepSeek | deepseek-v4-pro | AI 对话 / 内容提取 fallback |
+| OpenAI | gpt-5.2 | AI 对话 / OpenAI Transcribe 备选 |
+| OpenRouter | claude-sonnet-4-6 | AI 对话（Claude / GPT / DeepSeek 聚合） |
+| Kimi（月之暗面） | kimi-k2.5 | AI 对话 fallback |
 
-> **语音输入**：固定使用 OpenAI Whisper，需要单独配置 OpenAI API Key。AI 对话可用任意 Provider。
+> 阿里云百炼（Qwen）和 MiniMax 已从默认 Provider 中移除；历史设置里如果还保留 `qwen` / `minimax`，前端和后台 worker 会自动回退到 OpenAI / DeepSeek / OpenRouter / Kimi 等仍在使用的 Provider。
+
+> **语音输入**：默认使用浏览器内置语音识别，无需 API Key。若浏览器不支持或识别不稳，可切换到阿里云 DashScope ASR；OpenAI 欠费时不要选择 OpenAI Transcribe。AI 对话可用任意 Provider。
+
+### DashScope 语音识别打通
+
+1. 在阿里云控制台开通 Model Studio，并创建 DashScope API Key。
+2. 确认账户可用额度或已充值后，在本地先跑探针：
+   ```bash
+   DASHSCOPE_API_KEY=sk-... npm run asr:test
+   ```
+3. 探针输出 `Welcome to Alibaba Cloud.` 之类文本后，打开 `/settings`，在“语音识别”里选择“阿里云 DashScope ASR”，填入同一个 API Key。
+4. 点击“测试识别”。如果显示“已通”并出现识别文本，说明 API Key、余额和模型权限都正常。
+5. 回到 `/chat` 点击麦克风，说一段英文，停止录音后应自动填入识别文本。
 
 ### API Key 跨设备同步
 用 Google 账号登录后，API Key 自动加密同步到 Supabase，换设备登录即恢复。
@@ -177,13 +190,62 @@ Settings 页面（`/settings`）配置，支持多个 Provider 自由切换。
 
 ## 基础设施 & 账号
 
-### Vercel
+### 腾讯云生产
+- 主机：`foresight`（`124.223.92.72`）
+- 应用目录：`/opt/good-english`
+- PM2 进程：`good-english`
+- 本机端口：`3456`
+- Nginx vhost：`/etc/nginx/sites-enabled/good-english`
+- 生产域名：`good-english.yizhou.chat`
+- DNS：`good-english.yizhou.chat` A 记录指向 `124.223.92.72`
+- HTTPS：Nginx 已预留 ACME challenge 路径；若证书申请遇到 Let’s Encrypt 授权状态错误，稍后重试 `certbot certonly --webroot -w /var/www/letsencrypt -d good-english.yizhou.chat`
+
+> 当前腾讯云服务已经在 `127.0.0.1:3456` 和 Nginx vhost 下运行。腾讯云是主生产环境，Vercel 仅作为备份预览。
+
+部署命令（本机同步到腾讯云）：
+```bash
+rsync -az --delete \
+  --exclude '.git/' --exclude '.next/' --exclude 'node_modules/' \
+  --exclude '.vercel/' --exclude '.playwright-mcp/' \
+  --exclude '.stitch/' --exclude '.superpowers/' \
+  --exclude 'DB/' --exclude '.env.local' \
+  --exclude 'client_secret*.json' --exclude '*.pem' \
+  ./ foresight:/opt/good-english/
+
+scp .env.local foresight:/tmp/good-english.env.local
+ssh foresight 'mv /tmp/good-english.env.local /opt/good-english/.env.local && chmod 600 /opt/good-english/.env.local'
+ssh foresight 'cd /opt/good-english && npm install && npm run build && pm2 startOrRestart ecosystem.config.cjs && pm2 save'
+```
+
+腾讯云健康检查：
+```bash
+ssh foresight 'curl -sS http://127.0.0.1:3456/api/health'
+curl --resolve good-english.yizhou.chat:80:124.223.92.72 \
+  http://good-english.yizhou.chat/api/health
+```
+
+### Vercel 备份
 - 项目：`liyizhous-projects/good-english`
-- 生产域名：`https://good-english-two.vercel.app`
-- 部署命令：
+- 备份域名：`https://good-english-two.vercel.app`
+- 备份部署命令：
   ```bash
   vercel deploy --prod --token YOUR_TOKEN --scope liyizhous-projects
   ```
+
+### Keepalive / 健康检查
+
+- `/api/health`：轻量健康接口，检查应用和 Supabase 环境变量是否就绪。
+- `/api/keepalive`：保活接口，会探测 `/api/health`、首页、导入页和 Supabase Auth 健康端点。
+- `vercel.json` 保留三天一次备份预览保活：`20 19 */3 * *`（UTC），约等于北京时间凌晨 `03:20`。
+
+手动检查：
+```bash
+curl --resolve good-english.yizhou.chat:80:124.223.92.72 \
+  http://good-english.yizhou.chat/api/health
+curl -sS https://good-english-two.vercel.app/api/health
+```
+
+如果 Supabase 项目已经被暂停，需要先在 Supabase Dashboard 手动恢复一次；恢复后这个 Cron 用来防止后续再次因为长期空闲而暂停。本机若把 Supabase 域名解析到 `198.18.x.x`，通常是本地代理/TUN fake-IP，不要直接据此改后端配置。
 
 ### Supabase
 - 项目 URL：`https://twjsspsplskqsgmnegrk.supabase.co`
@@ -322,7 +384,7 @@ worker 默认使用 Supabase Realtime 监听新任务，并用 60 秒轻量轮�
 - 现在采用正则实时提取 `"reply"` 字段内容，逐字流式展示，延迟感消除
 
 **推理模型兼容（`<think>` 过滤）**
-- Qwen / DeepSeek-R1 等推理模型会在回复前输出 `<think>...</think>` 推理过程
+- DeepSeek-R1 / DeepSeek reasoning 等推理模型会在回复前输出 `<think>...</think>` 推理过程
 - 三层过滤：流式过程中跳过 think 块 → 全文 strip → parsed.reply 再 strip
 - 用户界面完全看不到推理过程，只看到干净的英文回复
 
@@ -394,7 +456,7 @@ app/
     ├── extract/route.ts      # 素材提取
     ├── evaluate/route.ts     # 练习评估
     ├── fetch-url/route.ts    # URL 抓取代理
-    └── transcribe/route.ts   # 语音识别（OpenAI Whisper）
+    └── transcribe/route.ts   # 语音识别（DashScope ASR / OpenAI Transcribe）
 
 lib/
 ├── ai/providers.ts           # 多 Provider 工厂

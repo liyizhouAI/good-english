@@ -218,7 +218,7 @@ export function LogoLarge() {
 
 // Re-export for backward compat in sidebar
 export { LogoBanner as TopBarLogo };
-export function SidebarLogo({ collapsed: _ }: { collapsed: boolean }) {
+export function SidebarLogo() {
   return null; // replaced by slogan in sidebar
 }
 export function GoodEnglishHeading() {

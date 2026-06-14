@@ -32,8 +32,59 @@ interface ChatMsg {
   feedback?: MessageFeedback;
 }
 
+interface BrowserSpeechRecognitionAlternative {
+  transcript: string;
+}
+
+interface BrowserSpeechRecognitionResult {
+  isFinal: boolean;
+  0?: BrowserSpeechRecognitionAlternative;
+}
+
+interface BrowserSpeechRecognitionEvent {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: BrowserSpeechRecognitionResult;
+  };
+}
+
+interface BrowserSpeechRecognitionErrorEvent {
+  error?: string;
+  message?: string;
+}
+
+interface BrowserSpeechRecognition {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+type BrowserSpeechWindow = Window &
+  typeof globalThis & {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  };
+
+function getBrowserSpeechRecognition() {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as BrowserSpeechWindow;
+  return (
+    speechWindow.SpeechRecognition ??
+    speechWindow.webkitSpeechRecognition ??
+    null
+  );
+}
+
 export default function ChatPage() {
-  const { getActiveProvider, settings } = useSettings();
+  const { getActiveProvider, getVoiceProvider } = useSettings();
   const [persona, setPersona] = useState<Persona>(PERSONAS[0]);
   const [scenario, setScenario] = useState<Scenario>(SCENARIOS[0]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -44,14 +95,17 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [browserSpeechSupported, setBrowserSpeechSupported] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    setBrowserSpeechSupported(Boolean(getBrowserSpeechRecognition()));
   }, []);
 
   useEffect(() => {
@@ -59,6 +113,13 @@ export default function ChatPage() {
   }, [messages]);
 
   const stopRecording = useCallback(async () => {
+    if (browserRecognitionRef.current) {
+      browserRecognitionRef.current.stop();
+      browserRecognitionRef.current = null;
+      setIsRecording(false);
+      return;
+    }
+
     if (!mediaRecorderRef.current) return;
     if (recordingTimerRef.current) {
       clearTimeout(recordingTimerRef.current);
@@ -83,12 +144,9 @@ export default function ChatPage() {
           return;
         }
 
-        // 语音识别固定使用 OpenAI Whisper
-        const openaiProvider = settings.providers.find(
-          (p) => p.id === "openai",
-        );
-        if (!openaiProvider?.apiKey) {
-          setError("请在设置页面配置 OpenAI API Key 以使用语音输入");
+        const voiceProvider = getVoiceProvider();
+        if (!voiceProvider?.apiKey) {
+          setError(`请在设置页面配置${voiceProvider?.name ?? "语音识别"} API Key`);
           resolve();
           return;
         }
@@ -97,7 +155,10 @@ export default function ChatPage() {
         try {
           const form = new FormData();
           form.append("audio", blob);
-          form.append("apiKey", openaiProvider.apiKey);
+          form.append("apiKey", voiceProvider.apiKey);
+          form.append("providerId", voiceProvider.id);
+          form.append("model", voiceProvider.defaultModel);
+          form.append("baseUrl", voiceProvider.baseUrl);
 
           const res = await fetch("/api/transcribe", {
             method: "POST",
@@ -125,10 +186,59 @@ export default function ChatPage() {
 
       mediaRecorderRef.current.stop();
     });
-  }, [settings.providers]);
+  }, [getVoiceProvider]);
 
   const startRecording = useCallback(async () => {
     try {
+      const voiceProvider = getVoiceProvider();
+      if (voiceProvider?.id === "browser") {
+        const BrowserSpeechRecognition = getBrowserSpeechRecognition();
+        if (!BrowserSpeechRecognition) {
+          setError(
+            "当前浏览器不支持内置语音识别。请用 Chrome，或在设置页切换到阿里云 DashScope ASR。",
+          );
+          return;
+        }
+
+        const recognition = new BrowserSpeechRecognition();
+        let finalTranscript = "";
+        recognition.lang = "en-US";
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.onresult = (event) => {
+          let interimTranscript = "";
+          for (let index = event.resultIndex; index < event.results.length; index += 1) {
+            const result = event.results[index];
+            const transcript = result[0]?.transcript ?? "";
+            if (result.isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          const nextText = `${finalTranscript} ${interimTranscript}`.trim();
+          if (nextText) setInput(nextText);
+        };
+        recognition.onerror = (event) => {
+          setError(
+            `浏览器语音识别失败：${event.error || event.message || "请重试"}`,
+          );
+          setIsRecording(false);
+          browserRecognitionRef.current = null;
+        };
+        recognition.onend = () => {
+          setIsRecording(false);
+          browserRecognitionRef.current = null;
+        };
+
+        browserRecognitionRef.current = recognition;
+        setIsRecording(true);
+        setError("");
+        recognition.start();
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       audioChunksRef.current = [];
@@ -153,7 +263,7 @@ export default function ChatPage() {
     } catch {
       setError("无法访问麦克风，请检查系统权限");
     }
-  }, [stopRecording]);
+  }, [getVoiceProvider, stopRecording]);
 
   const toggleRecording = useCallback(() => {
     if (isRecording) {
@@ -229,8 +339,8 @@ export default function ChatPage() {
         // Stream the partial reply in real-time by extracting it from partial JSON
         const stripped = fullText.replace(/<think>[\s\S]*?<\/think>/gi, "");
         const partialMatch =
-          stripped.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/s) ||
-          stripped.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/s);
+          stripped.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/) ||
+          stripped.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
         if (partialMatch) {
           const partialReply = partialMatch[1]
             .replace(/\\n/g, "\n")
@@ -287,15 +397,21 @@ export default function ChatPage() {
     setError("");
   }
 
-  const hasVoiceKey = !!settings.providers.find((p) => p.id === "openai")
-    ?.apiKey;
+  const voiceProvider = getVoiceProvider();
+  const isBrowserVoice = voiceProvider?.id === "browser";
+  const hasVoiceKey = isBrowserVoice
+    ? browserSpeechSupported
+    : !!voiceProvider?.apiKey;
+  const voiceProviderName = voiceProvider?.name ?? "语音识别";
   const micButton = (
     <button
       onClick={toggleRecording}
       disabled={isLoading || isTranscribing || !hasVoiceKey}
       title={
         !hasVoiceKey
-          ? "需要配置 OpenAI API Key"
+          ? isBrowserVoice
+            ? "当前浏览器不支持内置语音识别，请用 Chrome 或切换语音 Provider"
+            : `需要配置${voiceProviderName} API Key`
           : isRecording
             ? "再次点击停止录音"
             : "点击开始说话"
@@ -396,12 +512,17 @@ export default function ChatPage() {
           (hasVoiceKey ? (
             <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-sm text-emerald-400 mb-4">
               <Mic className="h-4 w-4 shrink-0" />
-              语音输入已就绪（OpenAI Whisper）— 点麦克风说话，停止后自动识别
+              语音输入已就绪（{voiceProviderName}）— 点麦克风说话，停止后自动识别
+            </div>
+          ) : isBrowserVoice ? (
+            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-400 mb-4">
+              <Mic className="h-4 w-4 shrink-0" />
+              当前浏览器不支持内置语音识别 — 建议用 Chrome，或在设置页切换到阿里云 DashScope ASR
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-400 mb-4">
               <Mic className="h-4 w-4 shrink-0" />
-              语音输入需要 OpenAI API Key — 去设置页配置
+              语音输入需要{voiceProviderName} API Key — 去设置页配置
             </div>
           ))}
 

@@ -21,7 +21,13 @@ function GoogleIcon() {
 }
 
 export function LoginCard({ syncing, synced }: Props) {
-  const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const {
+    user,
+    loading,
+    error: authStatusError,
+    signInWithGoogle,
+    signOut,
+  } = useAuth();
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState('');
 
@@ -83,6 +89,11 @@ export function LoginCard({ syncing, synced }: Props) {
       <p className="text-xs text-[var(--muted-foreground)] mb-4">
         用 Google 账号一键登录，API Key 自动加密保存到云端，换设备也能自动恢复。
       </p>
+      {authStatusError && (
+        <p className="mb-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          {authStatusError}
+        </p>
+      )}
       <button
         onClick={handleGoogle}
         disabled={signing}

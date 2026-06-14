@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  REALTIME_SUBSCRIBE_STATES,
+  type RealtimeChannel,
+} from "@supabase/supabase-js";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { addWords } from "@/lib/db/vocabulary";
@@ -9,11 +12,9 @@ import { addPatterns } from "@/lib/db/patterns";
 import {
   addMaterial,
   getAllMaterials,
-  deleteMaterial,
 } from "@/lib/db/materials";
 import type {
   ExtractionResult,
-  MaterialRecord,
   MaterialSourceItem,
 } from "@/lib/types/material";
 import type { WordCategory } from "@/lib/types/vocabulary";
@@ -153,7 +154,12 @@ function formatImportError(error: unknown): string {
 
 export default function ImportPage() {
   const { getActiveProvider } = useSettings();
-  const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    error: authStatusError,
+    signInWithGoogle,
+  } = useAuth();
   const [mode, setMode] = useState<ImportMode>("url");
   const [textInput, setTextInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
@@ -280,8 +286,8 @@ export default function ImportPage() {
             refreshJobs(currentUserId).catch(() => {});
           },
         )
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
+        .subscribe((status: REALTIME_SUBSCRIBE_STATES) => {
+          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             refreshJobs(currentUserId).catch(() => {});
           }
         });
@@ -332,61 +338,6 @@ export default function ImportPage() {
     const supabase = createClient();
     await supabase.from("content_fetch_jobs").delete().eq("id", id);
     setQueuedJobs((prev) => prev.filter((j) => j.id !== id));
-  }
-
-  async function fetchAndExtract(
-    url: string,
-    provider: ReturnType<typeof getActiveProvider>,
-  ): Promise<{ extraction: ExtractionResult; source: FetchedSource } | null> {
-    const urlType = detectUrlType(url);
-    const fetchMsgs: Record<NonNullable<UrlContentType>, string> = {
-      youtube: "📹 正在提取字幕...",
-      twitter: "🐦 正在抓取全文...",
-      zhihu: "📚 正在抓取知乎...",
-      wechat: "💬 正在抓取公众号...",
-      xiaohongshu: "📕 正在抓取小红书...",
-      generic: "🌐 正在抓取网页...",
-    };
-    setExtractingMsg(fetchMsgs[urlType ?? "generic"]);
-
-    const fetchRes = await fetch("/api/fetch-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    const fetchData = await fetchRes.json();
-    if (!fetchRes.ok) throw new Error(fetchData.error || "抓取失败");
-
-    const content: string = fetchData.content;
-    if (!content.trim()) throw new Error("抓取内容为空");
-
-    setExtractingMsg(
-      fetchData.isLong
-        ? "📊 长视频已抽样，AI 正在提取词汇..."
-        : "AI 正在提取词汇和句型...",
-    );
-
-    const extractRes = await fetch("/api/extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, provider }),
-    });
-    const extractData = await extractRes.json();
-    if (!extractRes.ok) throw new Error(extractData.error || "提取失败");
-    return {
-      extraction: extractData as ExtractionResult,
-      source: {
-        url,
-        title: fetchData.title,
-        contentType: fetchData.contentType ?? (urlType || "generic"),
-        content,
-        markdown: fetchData.markdown,
-        archivePath: fetchData.archivePath,
-        archiveRelativePath: fetchData.archiveRelativePath,
-        fetchMethod: fetchData.fetchMethod,
-        warning: fetchData.warning,
-      },
-    };
   }
 
   async function handleExtract() {
@@ -557,11 +508,6 @@ export default function ImportPage() {
       setFetchedSources([]);
       setQueuedJobs([]);
     }, 2000);
-  }
-
-  async function handleDeleteMaterial(id: string) {
-    await deleteMaterial(id);
-    await loadMaterials();
   }
 
   function renderQueuedJobsPanel(showHeader = true) {
@@ -788,6 +734,11 @@ export default function ImportPage() {
                 URL 导入会把任务发给 Mac mini 处理，所以需要先登录
                 Google，系统才能把结果写回你自己的 Supabase。
               </p>
+              {authStatusError && (
+                <p className="mt-2 text-xs text-amber-200/80">
+                  {authStatusError}
+                </p>
+              )}
               <button
                 onClick={async () => {
                   setAuthError("");

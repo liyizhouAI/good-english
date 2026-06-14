@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import {
   type AppSettings,
   type ProviderConfig,
+  type VoiceProviderConfig,
+  type VoiceProviderId,
   DEFAULT_PROVIDERS,
+  DEFAULT_VOICE_PROVIDERS,
+  RETIRED_PROVIDER_IDS,
 } from "@/lib/types/provider";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -13,11 +18,23 @@ import {
 } from "@/lib/supabase/settings-sync";
 
 const SETTINGS_KEY = "good-english-settings";
+const RETIRED_PROVIDER_ID_SET = new Set(RETIRED_PROVIDER_IDS);
+const PROVIDER_PRIORITY = ["deepseek", "openrouter", "kimi", "openai"];
+const VOICE_PROVIDER_IDS = new Set<VoiceProviderId>([
+  "browser",
+  "dashscope",
+  "openai",
+]);
+const LEGACY_DEFAULT_MODELS: Record<string, Set<string>> = {
+  openai: new Set(["gpt-5.5", "gpt-5.5-mini", "gpt-4.5"]),
+  deepseek: new Set(["deepseek-chat", "deepseek-reasoner"]),
+};
 
 const DEFAULT_SETTINGS: AppSettings = {
-  activeProviderId: "qwen",
-  voiceProviderId: "openai",
+  activeProviderId: "deepseek",
+  voiceProviderId: "browser",
   providers: DEFAULT_PROVIDERS,
+  voiceProviders: DEFAULT_VOICE_PROVIDERS,
 };
 const SYNC_TIMEOUT_MS = 8000;
 
@@ -26,16 +43,9 @@ function loadLocalSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
-      const parsed: AppSettings = JSON.parse(stored);
-      const existingIds = new Set(parsed.providers.map((p) => p.id));
-      const newProviders = DEFAULT_PROVIDERS.filter(
-        (p) => !existingIds.has(p.id),
-      );
-      return {
-        activeProviderId: parsed.activeProviderId ?? "qwen",
-        voiceProviderId: parsed.voiceProviderId ?? "openai",
-        providers: [...parsed.providers, ...newProviders],
-      };
+      const normalized = normalizeSettings(JSON.parse(stored) as AppSettings);
+      saveLocalSettings(normalized);
+      return normalized;
     }
   } catch {
     /* ignore */
@@ -58,12 +68,146 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 // Merge remote settings (remote keys win, but keep local keys for providers not in remote)
 function mergeSettings(local: AppSettings, remote: AppSettings): AppSettings {
-  const remoteIds = new Set(remote.providers.map((p) => p.id));
-  const localOnly = local.providers.filter((p) => !remoteIds.has(p.id));
+  const normalizedRemote = normalizeSettings(remote);
+  const normalizedLocal = normalizeSettings(local);
+  const remoteIds = new Set(normalizedRemote.providers.map((p) => p.id));
+  const localOnly = normalizedLocal.providers.filter((p) => !remoteIds.has(p.id));
+  const remoteVoiceIds = new Set(
+    normalizedRemote.voiceProviders.map((p) => p.id),
+  );
+  const localOnlyVoice = normalizedLocal.voiceProviders.filter(
+    (p) => !remoteVoiceIds.has(p.id),
+  );
+  return normalizeSettings({
+    activeProviderId: normalizedRemote.activeProviderId,
+    voiceProviderId: normalizedRemote.voiceProviderId,
+    providers: [...normalizedRemote.providers, ...localOnly],
+    voiceProviders: [...normalizedRemote.voiceProviders, ...localOnlyVoice],
+  });
+}
+
+function chooseActiveProvider(providers: ProviderConfig[], preferred?: string) {
+  const providerIds = new Set(providers.map((provider) => provider.id));
+  if (preferred && providerIds.has(preferred)) {
+    const provider = providers.find((item) => item.id === preferred);
+    if (provider?.apiKey || preferred !== "openai") return preferred;
+  }
+
+  for (const providerId of PROVIDER_PRIORITY) {
+    const provider = providers.find(
+      (item) => item.id === providerId && item.apiKey,
+    );
+    if (provider) return provider.id;
+  }
+
+  return providerIds.has("deepseek")
+    ? "deepseek"
+    : providers[0]?.id ?? "deepseek";
+}
+
+function normalizeProvider(provider: ProviderConfig): ProviderConfig {
+  const defaultProvider = DEFAULT_PROVIDERS.find((item) => item.id === provider.id);
+  if (!defaultProvider) return provider;
+
+  const legacyDefaults = LEGACY_DEFAULT_MODELS[provider.id];
+  const shouldUseNewDefault =
+    !defaultProvider.models.includes(provider.defaultModel) ||
+    !!legacyDefaults?.has(provider.defaultModel);
+
   return {
-    activeProviderId: remote.activeProviderId,
-    voiceProviderId: remote.voiceProviderId,
-    providers: [...remote.providers, ...localOnly],
+    ...defaultProvider,
+    baseUrl: provider.baseUrl || defaultProvider.baseUrl,
+    apiKey: provider.apiKey ?? "",
+    defaultModel: shouldUseNewDefault
+      ? defaultProvider.defaultModel
+      : provider.defaultModel,
+  };
+}
+
+function normalizeVoiceProvider(
+  provider: VoiceProviderConfig,
+  fallbackApiKey = "",
+): VoiceProviderConfig {
+  const defaultProvider = DEFAULT_VOICE_PROVIDERS.find(
+    (item) => item.id === provider.id,
+  );
+  if (!defaultProvider) return provider;
+
+  return {
+    ...defaultProvider,
+    baseUrl: provider.baseUrl || defaultProvider.baseUrl,
+    apiKey: provider.apiKey || fallbackApiKey,
+    defaultModel: defaultProvider.models.includes(provider.defaultModel)
+      ? provider.defaultModel
+      : defaultProvider.defaultModel,
+  };
+}
+
+function chooseVoiceProvider(
+  providers: VoiceProviderConfig[],
+  preferred?: string,
+): VoiceProviderId {
+  const providerIds = new Set(providers.map((provider) => provider.id));
+  if (
+    preferred === "browser" ||
+    preferred === "dashscope" ||
+    preferred === "openai"
+  ) {
+    if (providerIds.has(preferred)) return preferred;
+  }
+
+  return "browser";
+}
+
+function normalizeSettings(settings: AppSettings): AppSettings {
+  const activeProviderId = RETIRED_PROVIDER_ID_SET.has(settings.activeProviderId)
+    ? undefined
+    : settings.activeProviderId;
+  const rawProviders = settings.providers ?? [];
+  const legacyDashScopeApiKey =
+    rawProviders.find((provider) => provider.id === "qwen")?.apiKey ?? "";
+  const legacyOpenAIApiKey =
+    rawProviders.find((provider) => provider.id === "openai")?.apiKey ?? "";
+  const providers = rawProviders.filter(
+    (provider) => !RETIRED_PROVIDER_ID_SET.has(provider.id),
+  ).map(normalizeProvider);
+  const existingIds = new Set(providers.map((provider) => provider.id));
+  const newProviders = DEFAULT_PROVIDERS.filter(
+    (provider) => !existingIds.has(provider.id),
+  );
+  const mergedProviders = [...providers, ...newProviders];
+  const hasSavedVoiceProviders = Array.isArray(settings.voiceProviders);
+  const rawVoiceProviders = (settings.voiceProviders ?? []).filter(
+    (provider): provider is VoiceProviderConfig =>
+      VOICE_PROVIDER_IDS.has(provider.id as VoiceProviderId),
+  );
+  const voiceProviderIds = new Set(rawVoiceProviders.map((provider) => provider.id));
+  const newVoiceProviders = DEFAULT_VOICE_PROVIDERS.filter(
+    (provider) => !voiceProviderIds.has(provider.id),
+  );
+  const mergedVoiceProviders = [...rawVoiceProviders, ...newVoiceProviders].map(
+    (provider) =>
+      normalizeVoiceProvider(
+        provider,
+        provider.id === "dashscope" ? legacyDashScopeApiKey : legacyOpenAIApiKey,
+      ),
+  );
+  const savedVoiceProvider = mergedVoiceProviders.find(
+    (provider) => provider.id === settings.voiceProviderId,
+  );
+  const preferredVoiceProviderId =
+    settings.voiceProviderId === "browser" || savedVoiceProvider?.apiKey
+      ? settings.voiceProviderId
+      : undefined;
+
+  return {
+    activeProviderId: chooseActiveProvider(mergedProviders, activeProviderId),
+    voiceProviderId: chooseVoiceProvider(
+      mergedVoiceProviders,
+      hasSavedVoiceProviders ? preferredVoiceProviderId : undefined,
+    ),
+    providers: mergedProviders,
+    voiceProviders: mergedVoiceProviders,
   };
 }
 
@@ -116,7 +260,9 @@ export function useSettings() {
       }
     }
 
-    supabase.auth.getUser().then(async ({ data }) => {
+    supabase.auth.getUser().then(async (
+      { data }: Awaited<ReturnType<typeof supabase.auth.getUser>>,
+    ) => {
       if (!data.user || cancelled) return;
       await syncSettings(local);
     });
@@ -124,7 +270,10 @@ export function useSettings() {
     // Re-sync when auth state changes (login/logout)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (
+      _event: AuthChangeEvent,
+      session: Session | null,
+    ) => {
       if (session?.user) {
         const local2 = loadLocalSettings();
         await syncSettings(local2);
@@ -194,7 +343,7 @@ export function useSettings() {
   );
 
   const setVoiceProvider = useCallback(
-    (voiceProviderId: "openai" | "minimax") => {
+    (voiceProviderId: VoiceProviderId) => {
       setSettings((prev) => {
         const next = { ...prev, voiceProviderId };
         persistSettings(next);
@@ -208,9 +357,25 @@ export function useSettings() {
     return settings.providers.find((p) => p.id === settings.activeProviderId);
   }, [settings]);
 
-  const getVoiceProvider = useCallback((): ProviderConfig | undefined => {
-    return settings.providers.find((p) => p.id === settings.voiceProviderId);
+  const getVoiceProvider = useCallback((): VoiceProviderConfig | undefined => {
+    return settings.voiceProviders.find((p) => p.id === settings.voiceProviderId);
   }, [settings]);
+
+  const updateVoiceProvider = useCallback(
+    (providerId: VoiceProviderId, updates: Partial<VoiceProviderConfig>) => {
+      setSettings((prev) => {
+        const next = {
+          ...prev,
+          voiceProviders: prev.voiceProviders.map((p) =>
+            p.id === providerId ? { ...p, ...updates } : p,
+          ),
+        };
+        persistSettings(next);
+        return next;
+      });
+    },
+    [persistSettings],
+  );
 
   // Immediate save (no debounce) — used by the manual "保存设置" button
   const forceSave = useCallback(async (): Promise<
@@ -237,6 +402,7 @@ export function useSettings() {
     syncing,
     synced,
     updateProvider,
+    updateVoiceProvider,
     setActiveProvider,
     setVoiceProvider,
     getActiveProvider,

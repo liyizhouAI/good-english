@@ -34,6 +34,8 @@ const CONTENT_FETCHER_PYTHON =
   (existsSync("/opt/homebrew/bin/python3")
     ? "/opt/homebrew/bin/python3"
     : "python3");
+const REMOTE_READER_PREFIX =
+  process.env.GOOD_ENGLISH_REMOTE_READER_PREFIX || "https://r.jina.ai/http://";
 const ARCHIVE_DIR =
   process.env.GOOD_ENGLISH_ARCHIVE_DIR ||
   path.join(process.cwd(), "DB");
@@ -42,14 +44,11 @@ const POLL_INTERVAL_MS = Number(process.env.GOOD_ENGLISH_POLL_INTERVAL_MS || 600
 const EXTRACT_TIMEOUT_MS = Number(process.env.GOOD_ENGLISH_EXTRACT_TIMEOUT_MS || 120000);
 const EXTRACT_RETRY_COUNT = Number(process.env.GOOD_ENGLISH_EXTRACT_RETRY_COUNT || 3);
 const WATCH_MODE = process.argv.includes("--watch");
+const RETIRED_PROVIDER_IDS = new Set(["qwen", "minimax"]);
+const PROVIDER_PRIORITY = ["openai", "deepseek", "openrouter", "kimi"];
 
 if (!SERVICE_ROLE_KEY) {
   console.error("❌ Missing SUPABASE_SERVICE_ROLE_KEY");
-  process.exit(1);
-}
-
-if (!existsSync(CONTENT_FETCHER_SCRIPT)) {
-  console.error(`❌ Content Fetcher script not found: ${CONTENT_FETCHER_SCRIPT}`);
   process.exit(1);
 }
 
@@ -208,8 +207,63 @@ function archiveMarkdown(url, type, markdown, title, assetDir) {
   };
 }
 
-async function fetchContent(url) {
-  const type = detectUrlType(url);
+function buildReaderMarkdown(url, type, title, markdown) {
+  return [
+    "---",
+    `title: "${(title || url).replace(/"/g, '\\"')}"`,
+    `source_url: ${url}`,
+    `content_type: ${type}`,
+    `fetched_at: ${new Date().toISOString()}`,
+    "fetch_method: jina-reader",
+    "---",
+    "",
+    markdown,
+    "",
+  ].join("\n");
+}
+
+async function fetchViaJinaReader(url, type) {
+  const response = await fetch(`${REMOTE_READER_PREFIX}${url}`, {
+    headers: { Accept: "text/plain" },
+  });
+  const raw = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`远程正文提取失败：HTTP ${response.status}`);
+  }
+
+  const warning = raw.match(/^Warning:\s*(.+)$/m)?.[1]?.trim();
+  const markdown = raw.match(/Markdown Content:\n([\s\S]+)$/)?.[1]?.trim();
+  const title = raw.match(/^Title:\s*(.*)$/m)?.[1]?.trim() || url;
+
+  if (warning) {
+    throw new Error(`远程正文提取不可用：${warning}`);
+  }
+
+  if (!markdown) {
+    throw new Error("远程正文提取未返回正文");
+  }
+
+  const content = stripMarkdown(markdown);
+  if (content.length < 80) {
+    throw new Error("远程正文提取结果过短");
+  }
+
+  const structuredMarkdown = buildReaderMarkdown(url, type, title, markdown);
+  const archived = archiveMarkdown(url, type, structuredMarkdown, title, null);
+
+  return {
+    title,
+    contentType: type,
+    content,
+    markdown: archived.markdown,
+    archivePath: archived.archivePath,
+    archiveRelativePath: archived.archiveRelativePath,
+    fetchMethod: "jina-reader",
+  };
+}
+
+async function fetchViaContentFetcher(url, type) {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "good-english-job-"));
 
   try {
@@ -254,6 +308,19 @@ async function fetchContent(url) {
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+async function fetchContent(url) {
+  const type = detectUrlType(url);
+
+  if (existsSync(CONTENT_FETCHER_SCRIPT)) {
+    return fetchViaContentFetcher(url, type);
+  }
+
+  console.warn(
+    `⚠️ Content Fetcher script not found, using remote reader: ${CONTENT_FETCHER_SCRIPT}`,
+  );
+  return fetchViaJinaReader(url, type);
 }
 
 async function extractContent(content, provider) {
@@ -307,9 +374,18 @@ async function getActiveProvider(userId) {
   }
 
   const settings = JSON.parse(data.settings_data);
-  const provider = settings.providers?.find(
-    (item) => item.id === settings.activeProviderId,
+  const providers = (settings.providers || []).filter(
+    (item) => !RETIRED_PROVIDER_IDS.has(item.id),
   );
+  const preferredProviderId = RETIRED_PROVIDER_IDS.has(settings.activeProviderId)
+    ? undefined
+    : settings.activeProviderId;
+  const provider =
+    providers.find((item) => item.id === preferredProviderId && item.apiKey) ||
+    PROVIDER_PRIORITY.map((providerId) =>
+      providers.find((item) => item.id === providerId && item.apiKey),
+    ).find(Boolean) ||
+    providers.find((item) => item.apiKey);
 
   if (!provider?.apiKey) {
     throw new Error("用户未配置可用的 AI Provider API Key");

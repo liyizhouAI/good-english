@@ -8,7 +8,9 @@ function isAppSettings(value: unknown): value is AppSettings {
   const settings = value as Partial<AppSettings>;
   return (
     typeof settings.activeProviderId === 'string' &&
-    (settings.voiceProviderId === 'openai' ||
+    (settings.voiceProviderId === 'browser' ||
+      settings.voiceProviderId === 'openai' ||
+      settings.voiceProviderId === 'dashscope' ||
       settings.voiceProviderId === 'minimax') &&
     Array.isArray(settings.providers)
   );
